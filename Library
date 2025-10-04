@@ -1,4 +1,4 @@
--- macOS Style UI Library (Anime Vanguards Style)
+-- macOS Style UI Library (Anime Vanguards Style - Fixed)
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
@@ -102,7 +102,6 @@ function Library:CreateWindow(title)
     
     local CloseBtn = createDot(Color3.fromRGB(255, 95, 87), 15)
     local MinBtn = createDot(Color3.fromRGB(255, 189, 68), 35)
-    local MaxBtn = createDot(Color3.fromRGB(40, 201, 64), 55)
     
     -- Title
     local Title = Instance.new("TextLabel")
@@ -162,13 +161,28 @@ function Library:CreateWindow(title)
     SearchBox.TextXAlignment = Enum.TextXAlignment.Left
     
     -- Sidebar
-    local Sidebar = Instance.new("Frame")
+    local Sidebar = Instance.new("ScrollingFrame")
     Sidebar.Name = "Sidebar"
     Sidebar.Parent = Main
     Sidebar.BackgroundColor3 = Colors.Sidebar
     Sidebar.BorderSizePixel = 0
     Sidebar.Position = UDim2.new(0, 0, 0, 50)
     Sidebar.Size = UDim2.new(0, 220, 1, -50)
+    Sidebar.ScrollBarThickness = 0
+    Sidebar.CanvasSize = UDim2.new(0, 0, 0, 0)
+    
+    local SidebarLayout = Instance.new("UIListLayout")
+    SidebarLayout.Parent = Sidebar
+    SidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    SidebarLayout.Padding = UDim.new(0, 5)
+    
+    SidebarLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        Sidebar.CanvasSize = UDim2.new(0, 0, 0, SidebarLayout.AbsoluteContentSize.Y + 10)
+    end)
+    
+    local SidebarPadding = Instance.new("UIPadding")
+    SidebarPadding.Parent = Sidebar
+    SidebarPadding.PaddingTop = UDim.new(0, 10)
     
     -- Content
     local Content = Instance.new("Frame")
@@ -246,7 +260,7 @@ function Library:CreateWindow(title)
         CategoryFrame.Name = name
         CategoryFrame.Parent = Sidebar
         CategoryFrame.BackgroundTransparency = 1
-        CategoryFrame.Size = UDim2.new(1, 0, 0, 0)
+        CategoryFrame.Size = UDim2.new(1, 0, 0, 30)
         
         local CategoryLabel = Instance.new("TextLabel")
         CategoryLabel.Parent = CategoryFrame
@@ -274,6 +288,7 @@ function Library:CreateWindow(title)
         ButtonContainer.BackgroundTransparency = 1
         ButtonContainer.Position = UDim2.new(0, 0, 0, 30)
         ButtonContainer.Size = UDim2.new(1, 0, 0, 0)
+        ButtonContainer.ClipsDescendants = true
         
         local ButtonLayout = Instance.new("UIListLayout")
         ButtonLayout.Parent = ButtonContainer
@@ -288,21 +303,34 @@ function Library:CreateWindow(title)
         CategoryBtn.Size = UDim2.new(1, 0, 1, 0)
         CategoryBtn.Text = ""
         
+        local function updateSize()
+            if expanded then
+                local contentHeight = 0
+                for _, btn in pairs(Category.Buttons) do
+                    contentHeight = contentHeight + 32
+                end
+                ButtonContainer.Size = UDim2.new(1, 0, 0, contentHeight)
+                CategoryFrame.Size = UDim2.new(1, 0, 0, 30 + contentHeight)
+            else
+                ButtonContainer.Size = UDim2.new(1, 0, 0, 0)
+                CategoryFrame.Size = UDim2.new(1, 0, 0, 30)
+            end
+        end
+        
         CategoryBtn.MouseButton1Click:Connect(function()
             expanded = not expanded
             Tween(Arrow, {Rotation = expanded and 0 or -90}, 0.2)
             
             if expanded then
-                ButtonContainer.Visible = true
-                local height = 30
-                for _, btn in pairs(Category.Buttons) do
-                    height = height + 32
+                local contentHeight = 0
+                for _ in pairs(Category.Buttons) do
+                    contentHeight = contentHeight + 32
                 end
-                Tween(CategoryFrame, {Size = UDim2.new(1, 0, 0, height)}, 0.2)
+                Tween(ButtonContainer, {Size = UDim2.new(1, 0, 0, contentHeight)}, 0.25)
+                Tween(CategoryFrame, {Size = UDim2.new(1, 0, 0, 30 + contentHeight)}, 0.25)
             else
-                Tween(CategoryFrame, {Size = UDim2.new(1, 0, 0, 30)}, 0.2)
-                wait(0.2)
-                ButtonContainer.Visible = false
+                Tween(ButtonContainer, {Size = UDim2.new(1, 0, 0, 0)}, 0.25)
+                Tween(CategoryFrame, {Size = UDim2.new(1, 0, 0, 30)}, 0.25)
             end
         end)
         
@@ -355,10 +383,12 @@ function Library:CreateWindow(title)
                 end
             end)
             
+            local Tab = Window:CreateTab(name)
+            
             Button.MouseButton1Click:Connect(function()
                 for _, cat in pairs(Window.Categories) do
                     for _, btn in pairs(cat.Buttons) do
-                        btn.BackgroundColor3 = Colors.Sidebar
+                        btn.Button.BackgroundColor3 = Colors.Sidebar
                         btn.Icon.TextColor3 = Colors.TextDark
                     end
                 end
@@ -366,38 +396,25 @@ function Library:CreateWindow(title)
                 Button.BackgroundColor3 = Colors.Selected
                 Icon.TextColor3 = Colors.Text
                 
+                for _, tab in pairs(Window.Tabs) do
+                    tab.Visible = false
+                end
+                Tab.Visible = true
+                Window.CurrentTab = Tab
+                
                 if callback then
                     callback()
                 end
             end)
             
-            table.insert(Category.Buttons, {Button = Button, Icon = Icon, Label = Label})
+            table.insert(Category.Buttons, {Button = Button, Icon = Icon, Label = Label, Tab = Tab})
             
-            local height = 30
-            for _ in pairs(Category.Buttons) do
-                height = height + 32
-            end
-            CategoryFrame.Size = UDim2.new(1, 0, 0, height)
+            updateSize()
             
-            local Tab = Window:CreateTab(name)
             return Tab
         end
         
         table.insert(Window.Categories, Category)
-        
-        -- Position categories
-        local yPos = 10
-        for _, cat in pairs(Window.Categories) do
-            cat.CategoryFrame = CategoryFrame
-            CategoryFrame.Position = UDim2.new(0, 0, 0, yPos)
-            
-            local height = 30
-            for _ in pairs(cat.Buttons) do
-                height = height + 32
-            end
-            yPos = yPos + height + 5
-        end
-        
         return Category
     end
     
@@ -433,7 +450,6 @@ function Library:CreateWindow(title)
         
         local Elements = {}
         
-        -- Section
         function Elements:CreateSection(name)
             local Section = Instance.new("Frame")
             Section.Parent = Tab
@@ -467,6 +483,41 @@ function Library:CreateWindow(title)
             end)
             
             local SectionElements = {}
+            
+            function SectionElements:CreateButton(config)
+                config = config or {}
+                local text = config.Name or "Button"
+                local callback = config.Callback or function() end
+                
+                local Button = Instance.new("TextButton")
+                Button.Parent = SectionContainer
+                Button.BackgroundColor3 = Colors.Accent
+                Button.BorderSizePixel = 0
+                Button.Size = UDim2.new(1, 0, 0, 38)
+                Button.Font = Enum.Font.GothamMedium
+                Button.Text = text
+                Button.TextColor3 = Colors.Text
+                Button.TextSize = 13
+                Button.AutoButtonColor = false
+                
+                local BtnCorner = Instance.new("UICorner")
+                BtnCorner.CornerRadius = UDim.new(0, 8)
+                BtnCorner.Parent = Button
+                
+                Button.MouseEnter:Connect(function()
+                    Tween(Button, {BackgroundColor3 = Color3.fromRGB(70, 140, 255)}, 0.15)
+                end)
+                
+                Button.MouseLeave:Connect(function()
+                    Tween(Button, {BackgroundColor3 = Colors.Accent}, 0.15)
+                end)
+                
+                Button.MouseButton1Click:Connect(function()
+                    pcall(callback)
+                end)
+                
+                return Button
+            end
             
             function SectionElements:CreateToggle(config)
                 config = config or {}
@@ -562,6 +613,122 @@ function Library:CreateWindow(title)
                 end)
                 
                 return Toggle
+            end
+            
+            function SectionElements:CreateSlider(config)
+                config = config or {}
+                local text = config.Name or "Slider"
+                local min = config.Min or 0
+                local max = config.Max or 100
+                local default = config.Default or min
+                local callback = config.Callback or function() end
+                
+                local Slider = Instance.new("Frame")
+                Slider.Parent = SectionContainer
+                Slider.BackgroundColor3 = Colors.Element
+                Slider.BorderSizePixel = 0
+                Slider.Size = UDim2.new(1, 0, 0, 50)
+                
+                local SliderCorner = Instance.new("UICorner")
+                SliderCorner.CornerRadius = UDim.new(0, 8)
+                SliderCorner.Parent = Slider
+                
+                local Label = Instance.new("TextLabel")
+                Label.Parent = Slider
+                Label.BackgroundTransparency = 1
+                Label.Position = UDim2.new(0, 12, 0, 8)
+                Label.Size = UDim2.new(1, -70, 0, 16)
+                Label.Font = Enum.Font.GothamMedium
+                Label.Text = text
+                Label.TextColor3 = Colors.Text
+                Label.TextSize = 13
+                Label.TextXAlignment = Enum.TextXAlignment.Left
+                
+                local Value = Instance.new("TextLabel")
+                Value.Parent = Slider
+                Value.BackgroundTransparency = 1
+                Value.Position = UDim2.new(1, -55, 0, 8)
+                Value.Size = UDim2.new(0, 45, 0, 16)
+                Value.Font = Enum.Font.GothamBold
+                Value.Text = tostring(default)
+                Value.TextColor3 = Colors.Accent
+                Value.TextSize = 13
+                Value.TextXAlignment = Enum.TextXAlignment.Right
+                
+                local SliderBack = Instance.new("Frame")
+                SliderBack.Parent = Slider
+                SliderBack.BackgroundColor3 = Color3.fromRGB(50, 50, 53)
+                SliderBack.BorderSizePixel = 0
+                SliderBack.Position = UDim2.new(0, 12, 1, -16)
+                SliderBack.Size = UDim2.new(1, -24, 0, 6)
+                
+                local BackCorner = Instance.new("UICorner")
+                BackCorner.CornerRadius = UDim.new(1, 0)
+                BackCorner.Parent = SliderBack
+                
+                local SliderFill = Instance.new("Frame")
+                SliderFill.Parent = SliderBack
+                SliderFill.BackgroundColor3 = Colors.Accent
+                SliderFill.BorderSizePixel = 0
+                SliderFill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+                
+                local FillCorner = Instance.new("UICorner")
+                FillCorner.CornerRadius = UDim.new(1, 0)
+                FillCorner.Parent = SliderFill
+                
+                local SliderBtn = Instance.new("TextButton")
+                SliderBtn.Parent = SliderBack
+                SliderBtn.BackgroundColor3 = Colors.Text
+                SliderBtn.BorderSizePixel = 0
+                SliderBtn.Position = UDim2.new((default - min) / (max - min), -6, 0.5, -6)
+                SliderBtn.Size = UDim2.new(0, 12, 0, 12)
+                SliderBtn.Text = ""
+                SliderBtn.AutoButtonColor = false
+                
+                local BtnCorner = Instance.new("UICorner")
+                BtnCorner.CornerRadius = UDim.new(1, 0)
+                BtnCorner.Parent = SliderBtn
+                
+                local dragging = false
+                local currentValue = default
+                Library.Flags[text] = currentValue
+                
+                local function update(input)
+                    local pos = math.clamp((input.Position.X - SliderBack.AbsolutePosition.X) / SliderBack.AbsoluteSize.X, 0, 1)
+                    currentValue = math.floor(min + (max - min) * pos)
+                    
+                    Library.Flags[text] = currentValue
+                    Value.Text = tostring(currentValue)
+                    
+                    SliderFill.Size = UDim2.new(pos, 0, 1, 0)
+                    SliderBtn.Position = UDim2.new(pos, -6, 0.5, -6)
+                    
+                    pcall(callback, currentValue)
+                end
+                
+                SliderBtn.MouseButton1Down:Connect(function()
+                    dragging = true
+                end)
+                
+                UserInputService.InputEnded:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                        dragging = false
+                    end
+                end)
+                
+                UserInputService.InputChanged:Connect(function(input)
+                    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                        update(input)
+                    end
+                end)
+                
+                SliderBack.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                        update(input)
+                    end
+                end)
+                
+                return Slider
             end
             
             function SectionElements:CreateDropdown(config)
@@ -692,9 +859,11 @@ function Library:CreateWindow(title)
                         DropBtn.Text = " " .. option
                         
                         opened = false
-                        DropList.Visible = false
+                        Tween(DropList, {Size = UDim2.new(0, 270, 0, 0)}, 0.2)
                         Tween(Dropdown, {Size = UDim2.new(1, 0, 0, desc and 55 or 45)}, 0.2)
                         Tween(Arrow, {Rotation = 0}, 0.2)
+                        wait(0.2)
+                        DropList.Visible = false
                         
                         pcall(callback, option)
                     end)
@@ -705,14 +874,16 @@ function Library:CreateWindow(title)
                     
                     if opened then
                         local listSize = #options * 25
-                        DropList.Size = UDim2.new(0, 270, 0, listSize)
                         DropList.Visible = true
+                        Tween(DropList, {Size = UDim2.new(0, 270, 0, listSize)}, 0.2)
                         Tween(Dropdown, {Size = UDim2.new(1, 0, 0, (desc and 60 or 50) + listSize)}, 0.2)
                         Tween(Arrow, {Rotation = 180}, 0.2)
                     else
-                        DropList.Visible = false
+                        Tween(DropList, {Size = UDim2.new(0, 270, 0, 0)}, 0.2)
                         Tween(Dropdown, {Size = UDim2.new(1, 0, 0, desc and 55 or 45)}, 0.2)
                         Tween(Arrow, {Rotation = 0}, 0.2)
+                        wait(0.2)
+                        DropList.Visible = false
                     end
                 end)
                 
@@ -723,26 +894,6 @@ function Library:CreateWindow(title)
         end
         
         return Elements
-    end
-    
-    -- Notify
-    function Window:Notify(config)
-        config = config or {}
-        local title = config.Title or "Notification"
-        local message = config.Message or ""
-        local duration = config.Duration or 3
-        local type = config.Type or "info"
-        
-        local colors = {
-            info = Colors.Accent,
-            success = Color3.fromRGB(52, 199, 89),
-            warning = Color3.fromRGB(255, 204, 0),
-            error = Color3.fromRGB(255, 59, 48)
-        }
-        
-        local color = colors[type] or Colors.Accent
-        
-        -- Toast implementation here (similar to before)
     end
     
     return Window
