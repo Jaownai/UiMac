@@ -1,23 +1,42 @@
--- macOS Style UI Library (Anime Vanguards Style - Fixed)
+-- macOS Style UI Library (Light Theme + Settings)
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Library = {}
 Library.Flags = {}
+Library.Theme = "Light"
 
--- Colors
-local Colors = {
-    Background = Color3.fromRGB(25, 25, 28),
-    Sidebar = Color3.fromRGB(20, 20, 23),
-    SidebarHover = Color3.fromRGB(35, 35, 38),
-    Selected = Color3.fromRGB(236, 72, 153),
-    Element = Color3.fromRGB(35, 35, 38),
-    TopBar = Color3.fromRGB(30, 30, 33),
-    Text = Color3.fromRGB(255, 255, 255),
-    TextDark = Color3.fromRGB(160, 160, 165),
-    Accent = Color3.fromRGB(59, 130, 246),
-    Border = Color3.fromRGB(45, 45, 48)
+-- Color Themes
+local Themes = {
+    Light = {
+        Background = Color3.fromRGB(245, 245, 247),
+        Sidebar = Color3.fromRGB(255, 255, 255),
+        SidebarHover = Color3.fromRGB(235, 235, 240),
+        Selected = Color3.fromRGB(0, 122, 255),
+        Element = Color3.fromRGB(255, 255, 255),
+        TopBar = Color3.fromRGB(250, 250, 252),
+        Text = Color3.fromRGB(0, 0, 0),
+        TextDark = Color3.fromRGB(100, 100, 105),
+        Accent = Color3.fromRGB(0, 122, 255),
+        Border = Color3.fromRGB(220, 220, 225),
+        Shadow = Color3.fromRGB(0, 0, 0)
+    },
+    Dark = {
+        Background = Color3.fromRGB(25, 25, 28),
+        Sidebar = Color3.fromRGB(20, 20, 23),
+        SidebarHover = Color3.fromRGB(35, 35, 38),
+        Selected = Color3.fromRGB(236, 72, 153),
+        Element = Color3.fromRGB(35, 35, 38),
+        TopBar = Color3.fromRGB(30, 30, 33),
+        Text = Color3.fromRGB(255, 255, 255),
+        TextDark = Color3.fromRGB(160, 160, 165),
+        Accent = Color3.fromRGB(59, 130, 246),
+        Border = Color3.fromRGB(45, 45, 48),
+        Shadow = Color3.fromRGB(0, 0, 0)
+    }
 }
+
+local Colors = Themes.Light
 
 -- Tween
 local function Tween(obj, props, duration)
@@ -59,6 +78,18 @@ function Library:CreateWindow(title)
     MainCorner.CornerRadius = UDim.new(0, 10)
     MainCorner.Parent = Main
     
+    -- Shadow Effect
+    local Shadow = Instance.new("ImageLabel")
+    Shadow.Name = "Shadow"
+    Shadow.Parent = Main
+    Shadow.BackgroundTransparency = 1
+    Shadow.Position = UDim2.new(0, -20, 0, -20)
+    Shadow.Size = UDim2.new(1, 40, 1, 40)
+    Shadow.ZIndex = 0
+    Shadow.Image = "rbxasset://textures/ui/GuiImagePlaceholder.png"
+    Shadow.ImageColor3 = Colors.Shadow
+    Shadow.ImageTransparency = 0.7
+    
     -- TopBar
     local TopBar = Instance.new("Frame")
     TopBar.Name = "TopBar"
@@ -77,6 +108,14 @@ function Library:CreateWindow(title)
     TopFix.BorderSizePixel = 0
     TopFix.Position = UDim2.new(0, 0, 1, -10)
     TopFix.Size = UDim2.new(1, 0, 0, 10)
+    
+    -- Border Line
+    local TopBorder = Instance.new("Frame")
+    TopBorder.Parent = TopBar
+    TopBorder.BackgroundColor3 = Colors.Border
+    TopBorder.BorderSizePixel = 0
+    TopBorder.Position = UDim2.new(0, 0, 1, -1)
+    TopBorder.Size = UDim2.new(1, 0, 0, 1)
     
     -- Window Buttons
     local function createDot(color, pos)
@@ -130,7 +169,8 @@ function Library:CreateWindow(title)
     local SearchBar = Instance.new("Frame")
     SearchBar.Parent = TopBar
     SearchBar.BackgroundColor3 = Colors.Element
-    SearchBar.BorderSizePixel = 0
+    SearchBar.BorderSizePixel = 1
+    SearchBar.BorderColor3 = Colors.Border
     SearchBar.Position = UDim2.new(1, -250, 0, 12)
     SearchBar.Size = UDim2.new(0, 230, 0, 28)
     
@@ -170,6 +210,14 @@ function Library:CreateWindow(title)
     Sidebar.Size = UDim2.new(0, 220, 1, -50)
     Sidebar.ScrollBarThickness = 0
     Sidebar.CanvasSize = UDim2.new(0, 0, 0, 0)
+    
+    -- Sidebar Border
+    local SidebarBorder = Instance.new("Frame")
+    SidebarBorder.Parent = Sidebar
+    SidebarBorder.BackgroundColor3 = Colors.Border
+    SidebarBorder.BorderSizePixel = 0
+    SidebarBorder.Position = UDim2.new(1, -1, 0, 0)
+    SidebarBorder.Size = UDim2.new(0, 1, 1, 0)
     
     local SidebarLayout = Instance.new("UIListLayout")
     SidebarLayout.Parent = Sidebar
@@ -249,6 +297,60 @@ function Library:CreateWindow(title)
     Window.Tabs = {}
     Window.Categories = {}
     Window.CurrentTab = nil
+    Window.Elements = {}
+    
+    -- Theme Switcher Function
+    function Window:SetTheme(theme)
+        Library.Theme = theme
+        Colors = Themes[theme]
+        
+        -- Update all colors
+        Main.BackgroundColor3 = Colors.Background
+        TopBar.BackgroundColor3 = Colors.TopBar
+        TopFix.BackgroundColor3 = Colors.TopBar
+        TopBorder.BackgroundColor3 = Colors.Border
+        Sidebar.BackgroundColor3 = Colors.Sidebar
+        SidebarBorder.BackgroundColor3 = Colors.Border
+        Content.BackgroundColor3 = Colors.Background
+        SearchBar.BackgroundColor3 = Colors.Element
+        SearchBar.BorderColor3 = Colors.Border
+        Title.TextColor3 = Colors.Text
+        Subtitle.TextColor3 = Colors.TextDark
+        SearchIcon.TextColor3 = Colors.TextDark
+        SearchBox.TextColor3 = Colors.Text
+        Shadow.ImageColor3 = Colors.Shadow
+        
+        -- Update all elements
+        for _, element in pairs(Window.Elements) do
+            if element.Type == "Toggle" or element.Type == "Dropdown" or element.Type == "Slider" or element.Type == "Button" then
+                if element.Frame then
+                    element.Frame.BackgroundColor3 = Colors.Element
+                end
+                if element.Label then
+                    element.Label.TextColor3 = Colors.Text
+                end
+                if element.Desc then
+                    element.Desc.TextColor3 = Colors.TextDark
+                end
+                if element.Icon then
+                    element.Icon.TextColor3 = Colors.TextDark
+                end
+            end
+        end
+        
+        -- Update categories
+        for _, cat in pairs(Window.Categories) do
+            for _, btn in pairs(cat.Buttons) do
+                if btn.Button.BackgroundColor3 ~= Colors.Selected then
+                    btn.Button.BackgroundColor3 = Colors.Sidebar
+                end
+                if btn.Icon.TextColor3 ~= Colors.Text then
+                    btn.Icon.TextColor3 = Colors.TextDark
+                end
+                btn.Label.TextColor3 = Colors.Text
+            end
+        end
+    end
     
     -- Create Category
     function Window:CreateCategory(name)
@@ -496,7 +598,7 @@ function Library:CreateWindow(title)
                 Button.Size = UDim2.new(1, 0, 0, 38)
                 Button.Font = Enum.Font.GothamMedium
                 Button.Text = text
-                Button.TextColor3 = Colors.Text
+                Button.TextColor3 = Color3.fromRGB(255, 255, 255)
                 Button.TextSize = 13
                 Button.AutoButtonColor = false
                 
@@ -505,7 +607,7 @@ function Library:CreateWindow(title)
                 BtnCorner.Parent = Button
                 
                 Button.MouseEnter:Connect(function()
-                    Tween(Button, {BackgroundColor3 = Color3.fromRGB(70, 140, 255)}, 0.15)
+                    Tween(Button, {BackgroundColor3 = Color3.fromRGB(10, 132, 255)}, 0.15)
                 end)
                 
                 Button.MouseLeave:Connect(function()
@@ -515,6 +617,8 @@ function Library:CreateWindow(title)
                 Button.MouseButton1Click:Connect(function()
                     pcall(callback)
                 end)
+                
+                table.insert(Window.Elements, {Type = "Button", Frame = Button})
                 
                 return Button
             end
@@ -529,7 +633,8 @@ function Library:CreateWindow(title)
                 local Toggle = Instance.new("Frame")
                 Toggle.Parent = SectionContainer
                 Toggle.BackgroundColor3 = Colors.Element
-                Toggle.BorderSizePixel = 0
+                Toggle.BorderSizePixel = 1
+                Toggle.BorderColor3 = Colors.Border
                 Toggle.Size = UDim2.new(1, 0, 0, desc and 55 or 45)
                 
                 local ToggleCorner = Instance.new("UICorner")
@@ -557,8 +662,9 @@ function Library:CreateWindow(title)
                 Label.TextSize = 13
                 Label.TextXAlignment = Enum.TextXAlignment.Left
                 
+                local Desc
                 if desc then
-                    local Desc = Instance.new("TextLabel")
+                    Desc = Instance.new("TextLabel")
                     Desc.Parent = Toggle
                     Desc.BackgroundTransparency = 1
                     Desc.Position = UDim2.new(0, 40, 0, 28)
@@ -572,7 +678,7 @@ function Library:CreateWindow(title)
                 
                 local ToggleBtn = Instance.new("TextButton")
                 ToggleBtn.Parent = Toggle
-                ToggleBtn.BackgroundColor3 = default and Colors.Accent or Color3.fromRGB(50, 50, 53)
+                ToggleBtn.BackgroundColor3 = default and Colors.Accent or Color3.fromRGB(200, 200, 205)
                 ToggleBtn.BorderSizePixel = 0
                 ToggleBtn.Position = UDim2.new(1, -55, 0.5, -11)
                 ToggleBtn.Size = UDim2.new(0, 45, 0, 22)
@@ -585,7 +691,7 @@ function Library:CreateWindow(title)
                 
                 local Circle = Instance.new("Frame")
                 Circle.Parent = ToggleBtn
-                Circle.BackgroundColor3 = Colors.Text
+                Circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
                 Circle.BorderSizePixel = 0
                 Circle.Position = default and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
                 Circle.Size = UDim2.new(0, 18, 0, 18)
@@ -605,12 +711,14 @@ function Library:CreateWindow(title)
                         Tween(ToggleBtn, {BackgroundColor3 = Colors.Accent}, 0.2)
                         Tween(Circle, {Position = UDim2.new(1, -20, 0.5, -9)}, 0.2)
                     else
-                        Tween(ToggleBtn, {BackgroundColor3 = Color3.fromRGB(50, 50, 53)}, 0.2)
+                        Tween(ToggleBtn, {BackgroundColor3 = Color3.fromRGB(200, 200, 205)}, 0.2)
                         Tween(Circle, {Position = UDim2.new(0, 2, 0.5, -9)}, 0.2)
                     end
                     
                     pcall(callback, toggled)
                 end)
+                
+                table.insert(Window.Elements, {Type = "Toggle", Frame = Toggle, Label = Label, Desc = Desc, Icon = Icon})
                 
                 return Toggle
             end
@@ -626,7 +734,8 @@ function Library:CreateWindow(title)
                 local Slider = Instance.new("Frame")
                 Slider.Parent = SectionContainer
                 Slider.BackgroundColor3 = Colors.Element
-                Slider.BorderSizePixel = 0
+                Slider.BorderSizePixel = 1
+                Slider.BorderColor3 = Colors.Border
                 Slider.Size = UDim2.new(1, 0, 0, 50)
                 
                 local SliderCorner = Instance.new("UICorner")
@@ -657,7 +766,7 @@ function Library:CreateWindow(title)
                 
                 local SliderBack = Instance.new("Frame")
                 SliderBack.Parent = Slider
-                SliderBack.BackgroundColor3 = Color3.fromRGB(50, 50, 53)
+                SliderBack.BackgroundColor3 = Color3.fromRGB(220, 220, 225)
                 SliderBack.BorderSizePixel = 0
                 SliderBack.Position = UDim2.new(0, 12, 1, -16)
                 SliderBack.Size = UDim2.new(1, -24, 0, 6)
@@ -678,7 +787,7 @@ function Library:CreateWindow(title)
                 
                 local SliderBtn = Instance.new("TextButton")
                 SliderBtn.Parent = SliderBack
-                SliderBtn.BackgroundColor3 = Colors.Text
+                SliderBtn.BackgroundColor3 = Colors.Accent
                 SliderBtn.BorderSizePixel = 0
                 SliderBtn.Position = UDim2.new((default - min) / (max - min), -6, 0.5, -6)
                 SliderBtn.Size = UDim2.new(0, 12, 0, 12)
@@ -728,6 +837,8 @@ function Library:CreateWindow(title)
                     end
                 end)
                 
+                table.insert(Window.Elements, {Type = "Slider", Frame = Slider, Label = Label})
+                
                 return Slider
             end
             
@@ -742,7 +853,8 @@ function Library:CreateWindow(title)
                 local Dropdown = Instance.new("Frame")
                 Dropdown.Parent = SectionContainer
                 Dropdown.BackgroundColor3 = Colors.Element
-                Dropdown.BorderSizePixel = 0
+                Dropdown.BorderSizePixel = 1
+                Dropdown.BorderColor3 = Colors.Border
                 Dropdown.Size = UDim2.new(1, 0, 0, desc and 55 or 45)
                 Dropdown.ClipsDescendants = true
                 
@@ -771,8 +883,9 @@ function Library:CreateWindow(title)
                 Label.TextSize = 13
                 Label.TextXAlignment = Enum.TextXAlignment.Left
                 
+                local Desc
                 if desc then
-                    local Desc = Instance.new("TextLabel")
+                    Desc = Instance.new("TextLabel")
                     Desc.Parent = Dropdown
                     Desc.BackgroundTransparency = 1
                     Desc.Position = UDim2.new(0, 40, 0, 28)
@@ -786,8 +899,9 @@ function Library:CreateWindow(title)
                 
                 local DropBtn = Instance.new("TextButton")
                 DropBtn.Parent = Dropdown
-                DropBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 48)
-                DropBtn.BorderSizePixel = 0
+                DropBtn.BackgroundColor3 = Color3.fromRGB(240, 240, 245)
+                DropBtn.BorderSizePixel = 1
+                DropBtn.BorderColor3 = Colors.Border
                 DropBtn.Position = UDim2.new(1, -285, 0, desc and 12 or 10)
                 DropBtn.Size = UDim2.new(0, 270, 0, 25)
                 DropBtn.Font = Enum.Font.Gotham
@@ -813,8 +927,9 @@ function Library:CreateWindow(title)
                 
                 local DropList = Instance.new("Frame")
                 DropList.Parent = Dropdown
-                DropList.BackgroundColor3 = Color3.fromRGB(40, 40, 43)
-                DropList.BorderSizePixel = 0
+                DropList.BackgroundColor3 = Color3.fromRGB(250, 250, 252)
+                DropList.BorderSizePixel = 1
+                DropList.BorderColor3 = Colors.Border
                 DropList.Position = UDim2.new(1, -285, 0, desc and 42 or 40)
                 DropList.Size = UDim2.new(0, 270, 0, 0)
                 DropList.Visible = false
@@ -835,7 +950,7 @@ function Library:CreateWindow(title)
                 for _, option in ipairs(options) do
                     local OptBtn = Instance.new("TextButton")
                     OptBtn.Parent = DropList
-                    OptBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 43)
+                    OptBtn.BackgroundColor3 = Color3.fromRGB(250, 250, 252)
                     OptBtn.BorderSizePixel = 0
                     OptBtn.Size = UDim2.new(1, 0, 0, 25)
                     OptBtn.Font = Enum.Font.Gotham
@@ -846,11 +961,11 @@ function Library:CreateWindow(title)
                     OptBtn.AutoButtonColor = false
                     
                     OptBtn.MouseEnter:Connect(function()
-                        OptBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 53)
+                        OptBtn.BackgroundColor3 = Color3.fromRGB(235, 235, 240)
                     end)
                     
                     OptBtn.MouseLeave:Connect(function()
-                        OptBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 43)
+                        OptBtn.BackgroundColor3 = Color3.fromRGB(250, 250, 252)
                     end)
                     
                     OptBtn.MouseButton1Click:Connect(function()
@@ -887,6 +1002,8 @@ function Library:CreateWindow(title)
                     end
                 end)
                 
+                table.insert(Window.Elements, {Type = "Dropdown", Frame = Dropdown, Label = Label, Desc = Desc, Icon = Icon})
+                
                 return Dropdown
             end
             
@@ -895,6 +1012,81 @@ function Library:CreateWindow(title)
         
         return Elements
     end
+    
+    -- Auto-create Settings Category
+    task.spawn(function()
+        wait(0.1)
+        local Settings = Window:CreateCategory("Settings")
+        local SettingsTab = Settings:CreateButton("UI Settings", "⚙️")
+        
+        local ThemeSection = SettingsTab:CreateSection("Appearance")
+        
+        ThemeSection:CreateToggle({
+            Name = "Dark Mode",
+            Description = "Switch between Light and Dark theme.",
+            Icon = "🌙",
+            Default = false,
+            Callback = function(value)
+                Window:SetTheme(value and "Dark" or "Light")
+            end
+        })
+        
+        ThemeSection:CreateDropdown({
+            Name = "Accent Color",
+            Description = "Choose UI accent color.",
+            Icon = "🎨",
+            Options = {"Blue", "Purple", "Pink", "Green", "Red"},
+            Default = "Blue",
+            Callback = function(value)
+                local accentColors = {
+                    Blue = Color3.fromRGB(0, 122, 255),
+                    Purple = Color3.fromRGB(159, 122, 234),
+                    Pink = Color3.fromRGB(236, 72, 153),
+                    Green = Color3.fromRGB(52, 199, 89),
+                    Red = Color3.fromRGB(255, 59, 48)
+                }
+                Colors.Accent = accentColors[value]
+                Themes.Light.Accent = accentColors[value]
+                Themes.Dark.Accent = accentColors[value]
+            end
+        })
+        
+        local UISection = SettingsTab:CreateSection("UI Settings")
+        
+        UISection:CreateSlider({
+            Name = "UI Scale",
+            Min = 80,
+            Max = 120,
+            Default = 100,
+            Callback = function(value)
+                local scale = value / 100
+                Main.Size = UDim2.new(0, 900 * scale, 0, 550 * scale)
+            end
+        })
+        
+        UISection:CreateToggle({
+            Name = "Animations",
+            Description = "Enable or disable UI animations.",
+            Icon = "✨",
+            Default = true
+        })
+        
+        UISection:CreateButton({
+            Name = "Reset Position",
+            Callback = function()
+                Tween(Main, {Position = UDim2.new(0.5, 0, 0.5, 0)}, 0.3)
+            end
+        })
+        
+        local InfoSection = SettingsTab:CreateSection("Information")
+        
+        InfoSection:CreateButton({
+            Name = "Check for Updates",
+            Callback = function()
+                print("Checking for updates...")
+            end
+        })
+    end)
     
     return Window
 end
