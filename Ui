@@ -1,0 +1,605 @@
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+local KaitunUI = {}
+KaitunUI.__index = KaitunUI
+
+local function getParentGui()
+	local ok, hui = pcall(function()
+		local f = rawget(_G, "gethui")
+		if type(f) == "function" then
+			return f()
+		end
+		return nil
+	end)
+	if ok and hui then
+		return hui
+	end
+	return game:GetService("CoreGui")
+end
+
+local function protectGuiIfPossible(screenGui)
+	pcall(function()
+		local synTbl = rawget(_G, "syn")
+		if type(synTbl) == "table" and type(synTbl.protect_gui) == "function" then
+			synTbl.protect_gui(screenGui)
+		end
+	end)
+end
+
+local function tween(obj, t, props, style, dir)
+	local tw = TweenService:Create(obj, TweenInfo.new(t, style or Enum.EasingStyle.Quart, dir or Enum.EasingDirection.Out), props)
+	tw:Play()
+	return tw
+end
+
+local function make(instanceType, props)
+	local inst = Instance.new(instanceType)
+	for k, v in pairs(props or {}) do
+		inst[k] = v
+	end
+	return inst
+end
+
+local function makeGradient(parent, rotation, keypoints)
+	local g = make("UIGradient", {
+		Rotation = rotation or 0,
+		Color = ColorSequence.new(keypoints or {
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 90, 90)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 200, 120)),
+		})
+	})
+	g.Parent = parent
+	return g
+end
+
+local Box = {}
+Box.__index = Box
+
+function Box:AddLine(text)
+	if self._destroyed then return end
+	if #self._lines >= 5 then return end
+
+	local lbl = self._templateText:Clone()
+	lbl.Visible = true
+	lbl.Name = "TextLabel"
+	lbl.Text = tostring(text or "")
+	lbl.Parent = self.Frame
+
+	table.insert(self._lines, lbl)
+	self:_reflow()
+end
+
+function Box:SetLines(lines)
+	if self._destroyed then return end
+	for _, l in ipairs(self._lines) do
+		pcall(function() l:Destroy() end)
+	end
+	self._lines = {}
+
+	if typeof(lines) ~= "table" then
+		lines = { tostring(lines or "") }
+	end
+
+	for i = 1, math.min(5, #lines) do
+		self:AddLine(lines[i])
+	end
+
+	self:_reflow()
+end
+
+function Box:Clear()
+	if self._destroyed then return end
+	for _, l in ipairs(self._lines) do
+		pcall(function() l:Destroy() end)
+	end
+	self._lines = {}
+	self:_reflow()
+end
+
+function Box:_reflow()
+	task.defer(function()
+		if self._destroyed then return end
+		local abs = self.Layout.AbsoluteContentSize
+		self.Frame.Size = UDim2.new(1, 0, 0, abs.Y + 18)
+	end)
+end
+
+function Box:Destroy()
+	self._destroyed = true
+	pcall(function() self.Frame:Destroy() end)
+end
+
+function KaitunUI.new(options)
+	local self = setmetatable({}, KaitunUI)
+
+	options = options or {}
+	self.TitleText = options.Title or "Kaitun UI"
+	self.DescText = options.Desc
+	self.ToggleKey = options.ToggleKey or Enum.KeyCode.RightShift
+
+	local sg = make("ScreenGui", {
+		Name = "KaitunUi",
+		ResetOnSpawn = false,
+		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+		IgnoreGuiInset = true,
+	})
+	sg.Parent = getParentGui()
+	protectGuiIfPossible(sg)
+
+	local kaitun = make("Frame", {
+		Name = "Kaitun",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(0, 520, 0, 340),
+		Position = UDim2.new(0.5, -260, 0.5, -170),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+	})
+	kaitun.Parent = sg
+
+	make("UIScale", { Name = "UIScale", Scale = 1 }).Parent = kaitun
+	make("UIAspectRatioConstraint", {
+		Name = "UIAspectRatioConstraint",
+		AspectRatio = 520/340,
+		DominantAxis = Enum.DominantAxis.Width
+	}).Parent = kaitun
+
+	local base = make("Frame", {
+		Name = "Base",
+		BackgroundColor3 = Color3.fromRGB(18, 18, 20),
+		Size = UDim2.new(1, 0, 1, 0),
+		Position = UDim2.new(0, 0, 0, 0),
+	})
+	base.Parent = kaitun
+
+	make("UICorner", { Name = "UICorner", CornerRadius = UDim.new(0, 16) }).Parent = base
+	make("UIAspectRatioConstraint", { Name = "UIAspectRatioConstraint", AspectRatio = 520/340 }).Parent = base
+	make("UIScale", { Name = "UIScale", Scale = 1 }).Parent = base
+
+	local gradientFrame = make("Frame", {
+		Name = "Gradient",
+		BackgroundColor3 = Color3.fromRGB(28, 28, 32),
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundTransparency = 0,
+	})
+	gradientFrame.Parent = base
+	make("UICorner", { Name = "UICorner", CornerRadius = UDim.new(0, 16) }).Parent = gradientFrame
+	makeGradient(gradientFrame, 120, {
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(35, 35, 45)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(18, 18, 20)),
+	})
+
+	local pattern = make("ImageLabel", {
+		Name = "Pattern",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 1, 0),
+		Image = options.PatternId or "rbxassetid://76129022679183",
+		ImageTransparency = 0.92,
+		ScaleType = Enum.ScaleType.Tile,
+		TileSize = UDim2.new(0, 200, 0, 200),
+	})
+	pattern.Parent = base
+
+	local coloredStroke = make("Frame", {
+		Name = "ColoredStroke",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 1, 0),
+	})
+	coloredStroke.Parent = base
+	make("UICorner", { Name = "UICorner", CornerRadius = UDim.new(0, 16) }).Parent = coloredStroke
+
+	local strokeIn = make("UIStroke", {
+		Name = "UIStrokeIn",
+		Thickness = 1.5,
+		Transparency = 0.25,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		Color = Color3.fromRGB(255, 255, 255),
+	})
+	strokeIn.Parent = coloredStroke
+	makeGradient(strokeIn, 0, {
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 120, 120)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 220, 140)),
+	})
+
+	local strokeOut = make("UIStroke", {
+		Name = "UIStrokeOut",
+		Thickness = 3,
+		Transparency = 0.72,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		Color = Color3.fromRGB(255, 255, 255),
+	})
+	strokeOut.Parent = coloredStroke
+	makeGradient(strokeOut, 0, {
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 120, 120)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 220, 140)),
+	})
+
+	local logo = make("ImageLabel", {
+		Name = "Logo",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(0, 34, 0, 34),
+		Position = UDim2.new(0, 16, 0, 14),
+		Image = options.LogoId or "rbxassetid://131009124220110",
+		ImageColor3 = Color3.fromRGB(255, 255, 255),
+	})
+	logo.Parent = base
+	makeGradient(logo, 0, {
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 120, 120)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 220, 140)),
+	})
+
+	local content = make("Frame", {
+		Name = "Content",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, -32, 1, -64),
+		Position = UDim2.new(0, 16, 0, 52),
+	})
+	content.Parent = base
+
+	make("UIListLayout", {
+		Name = "UIListLayout",
+		FillDirection = Enum.FillDirection.Vertical,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 12),
+	}).Parent = content
+
+	local top = make("Frame", {
+		Name = "Top",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, 64),
+	})
+	top.LayoutOrder = 1
+	top.Parent = content
+
+	make("UIPadding", {
+		Name = "UIPadding",
+		PaddingTop = UDim.new(0, 4),
+		PaddingBottom = UDim.new(0, 4),
+	}).Parent = top
+
+	make("UIListLayout", {
+		Name = "UIListLayout",
+		FillDirection = Enum.FillDirection.Vertical,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 2),
+	}).Parent = top
+
+	local titleLbl = make("TextLabel", {
+		Name = "Title",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, 28),
+		Font = options.TitleFont or Enum.Font.FredokaOne,
+		TextSize = 20,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Center,
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		Text = self.TitleText,
+	})
+	titleLbl.LayoutOrder = 1
+	titleLbl.Parent = top
+
+	local descLbl = make("TextLabel", {
+		Name = "Title",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, 18),
+		Font = options.DescFont or Enum.Font.FredokaOne,
+		TextSize = 14,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Center,
+		TextColor3 = Color3.fromRGB(190, 190, 200),
+		Text = tostring(self.DescText or ""),
+	})
+	descLbl.LayoutOrder = 2
+	descLbl.Parent = top
+	descLbl.Visible = (self.DescText ~= nil and tostring(self.DescText) ~= "")
+
+	local list = make("Frame", {
+		Name = "List",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 1, -76),
+	})
+	list.LayoutOrder = 2
+	list.Parent = content
+
+	local scroll = make("ScrollingFrame", {
+		Name = "ScrollingFrame",
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Size = UDim2.new(1, 0, 1, 0),
+		CanvasSize = UDim2.new(0, 0, 0, 0),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ScrollBarThickness = 4,
+		ScrollingDirection = Enum.ScrollingDirection.Y,
+	})
+	scroll.Parent = list
+
+	make("UIPadding", {
+		Name = "UIPadding",
+		PaddingTop = UDim.new(0, 4),
+		PaddingBottom = UDim.new(0, 6),
+		PaddingLeft = UDim.new(0, 2),
+		PaddingRight = UDim.new(0, 8),
+	}).Parent = scroll
+
+	make("UIListLayout", {
+		Name = "UIListLayout",
+		FillDirection = Enum.FillDirection.Vertical,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 10),
+	}).Parent = scroll
+
+	local boxTemplate = make("Frame", {
+		Name = "Box",
+		BackgroundColor3 = Color3.fromRGB(22, 22, 26),
+		Size = UDim2.new(1, 0, 0, 44),
+	})
+	boxTemplate.Visible = false
+	boxTemplate.Parent = scroll
+
+	make("UICorner", { Name = "UICorner", CornerRadius = UDim.new(0, 14) }).Parent = boxTemplate
+	make("UIAspectRatioConstraint", { Name = "UIAspectRatioConstraint", AspectRatio = 999999 }).Parent = boxTemplate
+
+	make("UIPadding", {
+		Name = "UIPadding",
+		PaddingTop = UDim.new(0, 8),
+		PaddingBottom = UDim.new(0, 10),
+		PaddingLeft = UDim.new(0, 12),
+		PaddingRight = UDim.new(0, 12),
+	}).Parent = boxTemplate
+
+	local boxLayout = make("UIListLayout", {
+		Name = "UIListLayout",
+		FillDirection = Enum.FillDirection.Vertical,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 6),
+	})
+	boxLayout.Parent = boxTemplate
+
+	local boxStroke = make("UIStroke", {
+		Name = "UIStroke",
+		Thickness = 1.2,
+		Transparency = 0.35,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		Color = Color3.fromRGB(255, 255, 255),
+	})
+	boxStroke.Parent = boxTemplate
+	makeGradient(boxStroke, 0, {
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 120, 120)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 220, 140)),
+	})
+
+	local textTemplate = make("TextLabel", {
+		Name = "TextLabel",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, 18),
+		Font = options.TextFont or Enum.Font.FredokaOne,
+		TextSize = 14,
+		TextColor3 = Color3.fromRGB(235, 235, 240),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Center,
+		TextWrapped = true,
+		Text = "Text",
+	})
+	textTemplate.Visible = false
+	textTemplate.Parent = boxTemplate
+
+	local toggleUi = make("Frame", {
+		Name = "ToggleUi",
+		BackgroundColor3 = Color3.fromRGB(20, 20, 24),
+		Size = UDim2.new(0, 54, 0, 54),
+		Position = UDim2.new(0, 20, 0.5, -27),
+	})
+	toggleUi.Parent = sg
+
+	make("UICorner", { Name = "UICorner", CornerRadius = UDim.new(0, 16) }).Parent = toggleUi
+	make("UIStroke", {
+		Name = "UIStroke",
+		Thickness = 1.2,
+		Transparency = 0.35,
+		Color = Color3.fromRGB(255, 255, 255),
+	}).Parent = toggleUi
+	make("UIAspectRatioConstraint", { Name = "UIAspectRatioConstraint", AspectRatio = 1 }).Parent = toggleUi
+
+	local toggleLogo = make("ImageLabel", {
+		Name = "Logo",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(0.7, 0, 0.7, 0),
+		Position = UDim2.new(0.15, 0, 0.15, 0),
+		Image = options.LogoId or "rbxassetid://131009124220110",
+	})
+	toggleLogo.Parent = toggleUi
+
+	local toggleBtn = make("TextButton", {
+		Name = "Button",
+		BackgroundTransparency = 1,
+		Text = "",
+		Size = UDim2.new(1, 0, 1, 0),
+	})
+	toggleBtn.Parent = toggleUi
+
+	local dragBtn = make("TextButton", {
+		Name = "Drag",
+		BackgroundTransparency = 1,
+		Text = "",
+		Size = UDim2.new(1, 0, 0, 64),
+		Position = UDim2.new(0, 0, 0, 0),
+	})
+	dragBtn.Parent = base
+
+	self._gui = sg
+	self._kaitun = kaitun
+	self._base = base
+	self._titleLbl = titleLbl
+	self._descLbl = descLbl
+	self._scroll = scroll
+	self._boxTemplate = boxTemplate
+	self._textTemplate = textTemplate
+	self._toggleUi = toggleUi
+
+	self._open = true
+	self._destroyed = false
+
+	base.AnchorPoint = Vector2.new(0.5, 0.5)
+	base.Position = UDim2.new(0.5, 0, 0.5, 0)
+	base.Size = UDim2.new(1, 0, 1, 0)
+
+	do
+		local dragging = false
+		local dragStart, startPos
+
+		local function update(input)
+			local delta = input.Position - dragStart
+			kaitun.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+
+		dragBtn.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				dragging = true
+				dragStart = input.Position
+				startPos = kaitun.Position
+				input.Changed:Connect(function()
+					if input.UserInputState == Enum.UserInputState.End then
+						dragging = false
+					end
+				end)
+			end
+		end)
+
+		dragBtn.InputChanged:Connect(function(input)
+			if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+				update(input)
+			end
+		end)
+	end
+
+	local function setOpen(state)
+		if self._destroyed then return end
+		state = not not state
+		if self._open == state then return end
+		self._open = state
+
+		local scaleObj = kaitun:FindFirstChild("UIScale")
+		if not scaleObj then
+			scaleObj = make("UIScale", { Name = "UIScale", Scale = 1 })
+			scaleObj.Parent = kaitun
+		end
+
+		if state then
+			kaitun.Visible = true
+			tween(scaleObj, 0.18, { Scale = 1 })
+		else
+			tween(scaleObj, 0.16, { Scale = 0.92 })
+			task.delay(0.12, function()
+				if self._destroyed then return end
+				if not self._open then
+					kaitun.Visible = false
+				end
+			end)
+		end
+	end
+
+	toggleBtn.MouseButton1Click:Connect(function()
+		setOpen(not self._open)
+	end)
+
+	UserInputService.InputBegan:Connect(function(input, gpe)
+		if gpe or self._destroyed then return end
+		if input.KeyCode == self.ToggleKey then
+			setOpen(not self._open)
+		end
+	end)
+
+	self._setOpen = setOpen
+
+	return self
+end
+
+function KaitunUI:SetTitle(text)
+	if self._destroyed then return end
+	self._titleLbl.Text = tostring(text or "")
+end
+
+function KaitunUI:SetDesc(text)
+	if self._destroyed then return end
+	self.DescText = text
+	self._descLbl.Text = tostring(text or "")
+	self._descLbl.Visible = (text ~= nil and tostring(text) ~= "")
+end
+
+function KaitunUI:Toggle(state)
+	if self._destroyed then return end
+	if state == nil then
+		self._setOpen(not self._open)
+	else
+		self._setOpen(state)
+	end
+end
+
+function KaitunUI:Open()
+	self:Toggle(true)
+end
+
+function KaitunUI:Close()
+	self:Toggle(false)
+end
+
+function KaitunUI:CreateBox(linesOrOptions)
+	if self._destroyed then return end
+
+	local boxFrame = self._boxTemplate:Clone()
+	boxFrame.Visible = true
+	boxFrame.Parent = self._scroll
+
+	local templateText = boxFrame:FindFirstChild("TextLabel")
+	if not templateText then
+		templateText = self._textTemplate:Clone()
+		templateText.Parent = boxFrame
+	end
+	templateText.Visible = false
+
+	local layout = boxFrame:FindFirstChild("UIListLayout")
+	if not layout then
+		layout = make("UIListLayout", {
+			Name = "UIListLayout",
+			FillDirection = Enum.FillDirection.Vertical,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 6),
+		})
+		layout.Parent = boxFrame
+	end
+
+	local boxObj = setmetatable({
+		Frame = boxFrame,
+		Layout = layout,
+		_templateText = templateText,
+		_lines = {},
+		_destroyed = false,
+	}, Box)
+
+	if typeof(linesOrOptions) == "table" then
+		if linesOrOptions.Lines then
+			boxObj:SetLines(linesOrOptions.Lines)
+		else
+			boxObj:SetLines(linesOrOptions)
+		end
+	else
+		if linesOrOptions ~= nil then
+			boxObj:SetLines({ tostring(linesOrOptions) })
+		else
+			boxObj:SetLines({})
+		end
+	end
+
+	return boxObj
+end
+
+function KaitunUI:Destroy()
+	if self._destroyed then return end
+	self._destroyed = true
+	pcall(function() self._gui:Destroy() end)
+end
+
+local gg = rawget(_G, "getgenv")
+local env = (type(gg) == "function" and gg()) or _G
+env.KaitunUI = KaitunUI
+
+return KaitunUI
