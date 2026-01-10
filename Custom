@@ -1,0 +1,631 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local GuiService = game:GetService("GuiService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local GC = getconnections or get_signal_cons
+if GC then
+    for i, v in next, GC(Players.LocalPlayer.Idled) do
+        if v["Disable"] then
+            v["Disable"](v)
+        elseif v["Disconnect"] then
+            v["Disconnect"](v)
+        end
+    end
+else
+    local VirtualUser = cloneref(game:GetService("VirtualUser"))
+    Players.LocalPlayer.Idled:Connect(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
+end
+
+local Compkiller = loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpaca-pin/CompKiller/refs/heads/main/src/source.luau"))();
+
+local Notifier = Compkiller.newNotify();
+
+local ConfigManager = Compkiller:ConfigManager({
+    Directory = "ShinoServices",
+    Config = "AutoBuy-Config"
+});
+
+local autoBuyEnabled = false
+local selectedPotions = {}
+
+local PotionIDs = {
+    ["Size Potion"] = 15000001,
+    ["Rebirth Potion"] = 15000002,
+    ["Enchant Potion"] = 15000003
+}
+
+local PotionStockPaths = {
+    ["Size Potion"] = function()
+        return game:GetService("Players").LocalPlayer.PlayerGui.ScreenGui["\233\155\134\229\184\130\229\149\134\229\186\151"].Frame.ScrollingFrame:GetChildren()[5].StockText
+    end,
+    ["Rebirth Potion"] = function()
+        return game:GetService("Players").LocalPlayer.PlayerGui.ScreenGui["\233\155\134\229\184\130\229\149\134\229\186\151"].Frame.ScrollingFrame:GetChildren()[4].StockText
+    end,
+    ["Enchant Potion"] = function()
+        return game:GetService("Players").LocalPlayer.PlayerGui.ScreenGui["\233\155\134\229\184\130\229\149\134\229\186\151"].Frame.ScrollingFrame.Temp.StockText
+    end
+}
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerName = LocalPlayer.Name
+
+local EXP_TARGET = 70000000000
+local HERO_TARGET = {}
+local autoCollectEnabled = false
+local autoFeedEnabled = false
+
+local Root = workspace["\230\136\152\230\150\151\229\156\186\230\153\175"][PlayerName]["\229\141\135\231\186\167\230\156\186\229\153\168\229\140\186"]
+local HeroesFolder = workspace["\230\136\152\230\150\151\229\156\186\230\153\175"][PlayerName].HerosFolder
+
+local CollectRemote = ReplicatedStorage.Msg.RemoteFunction
+local FeedRemote = ReplicatedStorage.Msg.RemoteEvent
+
+local Farms = {
+    ["\229\183\165\228\189\156\229\140\1861"] = 6,
+    ["\229\183\165\228\189\156\229\140\1862"] = 6,
+    ["\229\183\165\228\189\156\229\140\1863"] = 6,
+    ["\229\183\165\228\189\156\229\140\1864"] = 6
+}
+
+local BackpackFrame = LocalPlayer.PlayerGui.ScreenGui.Main.Backpack["\228\187\147\229\186\147"]
+local BackpackSlots = BackpackFrame.ScrollingFrame
+
+local function checkStock(potionName)
+    local success, stockText = pcall(function()
+        local stockPath = PotionStockPaths[potionName]
+        if stockPath then
+            return stockPath().Text
+        end
+        return nil
+    end)
+    
+    if success and stockText then
+        if string.find(stockText, "Left: 0") or string.find(stockText, "Left:0") then
+            return false
+        end
+        
+        local leftAmount = string.match(stockText, "Left:%s*(%d+)")
+        if leftAmount then
+            local amount = tonumber(leftAmount)
+            return amount and amount > 0
+        end
+        
+        return true
+    end
+
+    return false
+end
+
+local function ensureArray(value)
+    if type(value) == "table" then
+        local arr = {}
+        for k, v in pairs(value) do
+            if v == true then
+                table.insert(arr, k)
+            elseif type(k) == "number" then
+                table.insert(arr, v)
+            end
+        end
+        return arr
+    elseif type(value) == "string" then
+        return {value}
+    end
+    return {}
+end
+
+local function countSelectedPotions()
+    local count = 0
+    for _ in pairs(selectedPotions) do
+        count = count + 1
+    end
+    return count
+end
+
+local function buyPotions()
+    local successCount = 0
+    local failCount = 0
+    local outOfStockCount = 0
+    
+    for key, potionName in pairs(selectedPotions) do
+        local actualName = type(key) == "string" and key or potionName
+        local potionID = PotionIDs[actualName]
+        
+        if potionID then
+            local hasStock = checkStock(actualName)
+            
+            if not hasStock then
+                outOfStockCount = outOfStockCount + 1
+            else
+                local success, err = pcall(function()
+                    local args = {
+                        "\232\180\173\228\185\176\233\173\148\230\179\149\232\141\175\230\176\180",
+                        {
+                            potionID,
+                            1
+                        }
+                    }
+                    game:GetService("ReplicatedStorage"):WaitForChild("Msg"):WaitForChild("RemoteFunction"):InvokeServer(unpack(args))
+                end)
+                
+                if success then
+                    successCount = successCount + 1
+                else
+                    failCount = failCount + 1
+                end
+            end
+            
+            task.wait(0.2)
+        end
+    end
+end
+
+local function ClickGui(obj)
+    GuiService.SelectedObject = nil
+    local gui = LocalPlayer.PlayerGui:FindFirstChild("_") or Instance.new("Frame")
+    gui.Name = "_"
+    gui.BackgroundTransparency = 1
+    gui.Parent = LocalPlayer.PlayerGui
+    LocalPlayer.PlayerGui.SelectionImageObject = gui
+    GuiService.SelectedObject = obj
+    task.wait()
+    VirtualInputManager:SendKeyEvent(true, "Return", false, game)
+    task.wait()
+    VirtualInputManager:SendKeyEvent(false, "Return", false, game)
+end
+
+local function GetPetPos(pet)
+    if pet.PrimaryPart then return pet.PrimaryPart.Position end
+    for _, v in ipairs(pet:GetDescendants()) do
+        if v:IsA("BasePart") then return v.Position end
+    end
+end
+
+local function IsOrange(slot)
+    local f = slot:FindFirstChild("Frame")
+    if not f then return false end
+    local n = f:FindFirstChild("ToolName")
+    if not n or n.Text ~= "Orange" then return false end
+    local m = f:FindFirstChild("Magic")
+    if m and m.Visible then return false end
+    return true
+end
+
+local function FindOrange()
+    for i = 1, 300 do
+        local s = BackpackSlots:FindFirstChild("WarehouseSlot_" .. i)
+        if s and IsOrange(s) then
+            return s
+        end
+    end
+end
+
+local function FarmHasTargetExp(farmName)
+    local index = tonumber(farmName:match("%d+"))
+    local folder = Root[farmName]["\230\158\156\229\174\158\230\156\186\229\153\168"]
+    local count = Farms[farmName]
+    
+    for i = 1, count do
+        local fruit = folder:FindFirstChild("ClientFruit_" .. i)
+        if fruit then
+            local exp = fruit:GetAttribute("Exp") or fruit:FindFirstChild("Exp") and fruit.Exp.Value
+            if exp and exp >= EXP_TARGET then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function collectFruits()
+    for farmName, count in pairs(Farms) do
+        if FarmHasTargetExp(farmName) then
+            local index = tonumber(farmName:match("%d+"))
+            local folder = Root[farmName]["\230\158\156\229\174\158\230\156\186\229\153\168"]
+            for i = 1, count do
+                local fruit = folder:FindFirstChild("ClientFruit_" .. i)
+                if fruit then
+                    local exp = fruit:GetAttribute("Exp") or fruit:FindFirstChild("Exp") and fruit.Exp.Value
+                    if exp and exp >= EXP_TARGET then
+                        CollectRemote:InvokeServer("\230\148\182\232\142\183\230\176\180\230\158\156", { index, i })
+                        task.wait(0.15)
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function feedPets()
+    local slot = FindOrange()
+    if slot then
+        ClickGui(slot)
+        task.wait(0.15)
+        for _, pet in ipairs(HeroesFolder:GetChildren()) do
+            if pet:IsA("Model") and HERO_TARGET[pet.Name] then
+                local pos = GetPetPos(pet)
+                if pos then
+                    FeedRemote:FireServer("\229\150\130\233\163\159", { pet.Name, pos })
+                    task.wait(0.12)
+                end
+            end
+        end
+    end
+end
+
+local function getAllPets()
+    local pets = {}
+    for _, pet in ipairs(HeroesFolder:GetChildren()) do
+        if pet:IsA("Model") then
+            table.insert(pets, pet.Name)
+        end
+    end
+    return pets
+end
+
+Compkiller:Loader("rbxassetid://120245531583106", 2.5).yield();
+
+local Window = Compkiller.new({
+    Name = "SHINO SERVICES",
+    Keybind = "LeftAlt",
+    Logo = "rbxassetid://120245531583106",
+    Scale = Compkiller.Scale.Window,
+    TextSize = 15,
+});
+
+local Watermark = Window:Watermark();
+
+Watermark:AddText({
+    Icon = "user",
+    Text = "Shino Services",
+});
+
+Watermark:AddText({
+    Icon = "server",
+    Text = "Bee Swarm Simulator",
+});
+
+Notifier.new({
+    Title = "Shino Services",
+    Content = "Auto System loaded successfully! Anti AFK is active.",
+    Duration = 5,
+    Icon = "rbxassetid://120245531583106"
+});
+
+Window:DrawCategory({
+    Name = "Main"
+});
+
+local AutoFarm = Window:DrawContainerTab({
+    Name = "Auto Farm",
+    Icon = "apple",
+});
+
+local Collect = AutoFarm:DrawTab({
+	Name = "Auto Collect",
+	Type = "Single",
+	EnableScrolling = true,
+});
+
+local CollectSection = Collect:DrawSection({
+    Name = "Fruit Collection",
+    Position = 'left'
+});
+
+CollectSection:AddSlider({
+    Name = "EXP Target (Billions)",
+    Min = 1,
+    Max = 100,
+    Default = 70,
+    Precise = 0,
+    Flag = "EXP_Target",
+    Callback = function(v)
+        EXP_TARGET = v * 1000000000
+    end
+})
+
+CollectSection:AddToggle({
+    Name = "Auto Collect Fruits",
+    Flag = "Auto_Collect",
+    Default = false,
+    Callback = function(v)
+        autoCollectEnabled = v
+        
+        if v then
+            task.spawn(function()
+                while autoCollectEnabled do
+                    collectFruits()
+                    task.wait(1)
+                end
+            end)
+        end
+    end
+})
+
+local Feed = AutoFarm:DrawTab({
+	Name = "Auto Feed",
+	Type = "Single",
+	EnableScrolling = true,
+});
+
+local FeedSection = Feed:DrawSection({
+    Name = "Pet Feeding",
+    Position = 'left'
+});
+
+FeedSection:AddDropdown({
+    Name = "Select Pets to Feed",
+    Default = {},
+    Multi = true,
+    Flag = "Selected_Pets",
+    Values = getAllPets(),
+    Callback = function(values)
+        HERO_TARGET = {}
+        if type(values) == "table" then
+            for k, v in pairs(values) do
+                if v == true then
+                    HERO_TARGET[k] = true
+                elseif type(k) == "number" then
+                    HERO_TARGET[v] = true
+                end
+            end
+        end
+    end
+})
+
+FeedSection:AddButton({
+    Name = "Refresh Pet List",
+    Callback = function()
+        local newPets = getAllPets()
+        Notifier.new({
+            Title = "Notification",
+            Content = "Pet list refreshed! Found " .. #newPets .. " pets.",
+            Duration = 3,
+            Icon = "rbxassetid://120245531583106"
+        });
+    end
+})
+
+FeedSection:AddToggle({
+    Name = "Auto Feed Pets",
+    Flag = "Auto_Feed",
+    Default = false,
+    Callback = function(v)
+        autoFeedEnabled = v
+        
+        if v then
+            BackpackFrame.Visible = true
+            task.spawn(function()
+                while autoFeedEnabled do
+                    feedPets()
+                    task.wait(0.25)
+                end
+            end)
+        end
+    end
+})
+
+local Buy = AutoFarm:DrawTab({
+	Name = "Auto Buy",
+	Type = "Single",
+	EnableScrolling = true,
+});
+
+local MainSection = Buy:DrawSection({
+    Name = "Potion Purchase",
+    Position = 'left'
+});
+
+MainSection:AddDropdown({
+    Name = "Select Potions",
+    Default = {},
+    Multi = true,
+    Flag = "Selected_Potions",
+    Values = {"Size Potion", "Rebirth Potion", "Enchant Potion"},
+    Callback = function(values)
+        selectedPotions = ensureArray(values)
+    end
+})
+
+MainSection:AddToggle({
+    Name = "Auto Buy",
+    Flag = "Auto_Buy",
+    Default = false,
+    Callback = function(v)
+        autoBuyEnabled = v
+        
+        if v then
+            task.spawn(function()
+                while autoBuyEnabled do
+                    if countSelectedPotions() > 0 then
+                        buyPotions()
+                    end
+                    task.wait(0.2)
+                end
+            end)
+        end
+    end
+})
+
+Window:DrawCategory({
+    Name = "Misc"
+});
+
+local SettingTab = Window:DrawContainerTab({
+    Name = "Settings",
+    Icon = "settings",
+});
+
+local SettingsSection = SettingTab:DrawTab({
+	Name = "Settings",
+	Type = "Single",
+	EnableScrolling = true,
+});
+
+local Settings = SettingsSection:DrawSection({
+    Name = "UI Settings",
+    Position = 'left'
+});
+
+Settings:AddToggle({
+    Name = "Always Show Frame",
+    Default = false,
+    Callback = function(v)
+        Window.AlwayShowTab = v;
+    end,
+});
+
+Settings:AddColorPicker({
+    Name = "Highlight",
+    Default = Compkiller.Colors.Highlight,
+    Callback = function(v)
+        Compkiller.Colors.Highlight = v;
+        Compkiller:RefreshCurrentColor();
+    end,
+});
+
+Settings:AddColorPicker({
+    Name = "Toggle Color",
+    Default = Compkiller.Colors.Toggle,
+    Callback = function(v)
+        Compkiller.Colors.Toggle = v;
+        Compkiller:RefreshCurrentColor(v);
+    end,
+});
+
+Settings:AddColorPicker({
+    Name = "Drop Color",
+    Default = Compkiller.Colors.DropColor,
+    Callback = function(v)
+        Compkiller.Colors.DropColor = v;
+        Compkiller:RefreshCurrentColor(v);
+    end,
+});
+
+Settings:AddColorPicker({
+    Name = "Risky",
+    Default = Compkiller.Colors.Risky,
+    Callback = function(v)
+        Compkiller.Colors.Risky = v;
+        Compkiller:RefreshCurrentColor(v);
+    end,
+});
+
+Settings:AddColorPicker({
+    Name = "Mouse Enter",
+    Default = Compkiller.Colors.MouseEnter,
+    Callback = function(v)
+        Compkiller.Colors.MouseEnter = v;
+        Compkiller:RefreshCurrentColor(v);
+    end,
+});
+
+Settings:AddColorPicker({
+    Name = "Block Color",
+    Default = Compkiller.Colors.BlockColor,
+    Callback = function(v)
+        Compkiller.Colors.BlockColor = v;
+        Compkiller:RefreshCurrentColor(v);
+    end,
+});
+
+Settings:AddColorPicker({
+    Name = "Background Color",
+    Default = Compkiller.Colors.BGDBColor,
+    Callback = function(v)
+        Compkiller.Colors.BGDBColor = v;
+        Compkiller:RefreshCurrentColor(v);
+    end,
+});
+
+Settings:AddColorPicker({
+    Name = "Block Background Color",
+    Default = Compkiller.Colors.BlockBackground,
+    Callback = function(v)
+        Compkiller.Colors.BlockBackground = v;
+        Compkiller:RefreshCurrentColor(v);
+    end,
+});
+
+Settings:AddColorPicker({
+    Name = "Stroke Color",
+    Default = Compkiller.Colors.StrokeColor,
+    Callback = function(v)
+        Compkiller.Colors.StrokeColor = v;
+        Compkiller:RefreshCurrentColor(v);
+    end,
+});
+
+Settings:AddColorPicker({
+    Name = "High Stroke Color",
+    Default = Compkiller.Colors.HighStrokeColor,
+    Callback = function(v)
+        Compkiller.Colors.HighStrokeColor = v;
+        Compkiller:RefreshCurrentColor(v);
+    end,
+});
+
+Settings:AddColorPicker({
+    Name = "Switch Color",
+    Default = Compkiller.Colors.SwitchColor,
+    Callback = function(v)
+        Compkiller.Colors.SwitchColor = v;
+        Compkiller:RefreshCurrentColor(v);
+    end,
+});
+
+Settings:AddColorPicker({
+    Name = "Line Color",
+    Default = Compkiller.Colors.LineColor,
+    Callback = function(v)
+        Compkiller.Colors.LineColor = v;
+        Compkiller:RefreshCurrentColor(v);
+    end,
+});
+
+Settings:AddButton({
+    Name = "Get Theme",
+    Callback = function()
+        Notifier.new({
+            Title = "Notification",
+            Content = "Copied Theme Color to your clipboard",
+            Duration = 5,
+            Icon = "rbxassetid://120245531583106"
+        });
+    end,
+});
+
+local ThemeSection = SettingTab:DrawTab({
+	Name = "Theme",
+	Type = "Single",
+	EnableScrolling = true,
+});
+
+ThemeSection:DrawSection({
+    Name = "UI Themes",
+    Position = 'left'
+}):AddDropdown({
+    Name = "Select Theme",
+    Default = "Default",
+    Values = {
+        "Default",
+        "Dark Green",
+        "Dark Blue",
+        "Purple Rose",
+        "Skeet"
+    },
+    Callback = function(v)
+        Compkiller:SetTheme(v)
+    end,
+})
+
+local ConfigUI = Window:DrawConfig({
+	Name = "Config",
+	Icon = "folder",
+	Config = ConfigManager
+});
+
+ConfigUI:Init();
