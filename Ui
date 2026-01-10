@@ -9286,28 +9286,35 @@ end
 end function __DIST.I()
 local types = __DIST.load('b')
 
-return function(self, properties: PullDownButtonProperties__DARKLUA_TYPE_0): PullDownButton__DARKLUA_TYPE_1	--// Imports
-	
-local creator = __DIST.load('d')
+local types = __DIST.load('b')
+
+return function(self, properties: PullDownButtonProperties__DARKLUA_TYPE_0): PullDownButton__DARKLUA_TYPE_1
+	--// Imports
+	local creator = __DIST.load('d')
 	local binder = __DIST.load('c')
 	local services = __DIST.load('e')
 
 	--// References
 	local create = creator.Create
 
-	local multi = properties.Multi
-	local selectedValues = {};
+	-- Initialize Multi-select support
+	local multi = properties.Multi == true
+	local selectedValues = {}
+	local selectedIndices = {}
 
-	if multi and properties.Value and type(properties.Value) == 'table' then 
+	-- Load initial values for multi-select
+	if multi then
+		if properties.Value and type(properties.Value) == 'table' then 
+			for _, val in ipairs(properties.Value) do 
+				table.insert(selectedValues, val)
+			end
+		end
+	end
 
-		for int, val in next, properties.Value do 
-			table.insert(selectedValues, val);
-		end;
-	end;
-
+	-- Ensure Label exists
 	if not properties.Label then 
-		properties.Label = '';
-	end;
+		properties.Label = ''
+	end
 
 	local userInputService = services.UserInputService
 	local tweenService = services.TweenService
@@ -9343,7 +9350,7 @@ local creator = __DIST.load('d')
 		local viewportSize = camera.ViewportSize
 
 		local desiredX = bodyPos.X + HORIZONTAL_OFFSET
-		local desiredY = bodyPos.Y + (bodySize.Y * 3) + (VERTICAL_PADDING * 3) -- position below
+		local desiredY = bodyPos.Y + (bodySize.Y * 3) + (VERTICAL_PADDING * 3)
 
 		local maxX = math.max(EDGE_BUFFER, viewportSize.X - EDGE_BUFFER - menuSize.X)
 		local maxY = math.max(EDGE_BUFFER, viewportSize.Y - EDGE_BUFFER - menuSize.Y)
@@ -9354,37 +9361,44 @@ local creator = __DIST.load('d')
 		menu.Position = UDim2.new(0, desiredX, 0, desiredY)
 	end
 
-	local backup = {}
+	local optionBackup = {}
 
-	local function updateHover(option, label, mode) 
-
-		if not mode then 
+	local function updateHover(option, label, checkmark, isHovered) 
+		if not isHovered then 
 			option.BackgroundTransparency = 1
-
 			label.TextColor3 = self.Theme.Text.Primary[1].Value
 			label.TextTransparency = self.Theme.Text.Primary[2].Value
-
-			return;
-		end;
+			if checkmark then
+				checkmark.ImageColor3 = self.Theme.Text.Primary[1].Value
+				checkmark.ImageTransparency = self.Theme.Text.Primary[2].Value
+			end
+			return
+		end
 
 		option.BackgroundTransparency = self.Theme.Controls.SelectionFocused[2].Value
-
 		label.TextColor3 = self.Theme.Controls.SelectionFocusedAccent[1].Value
 		label.TextTransparency = self.Theme.Controls.SelectionFocusedAccent[2].Value
-	end;
+		if checkmark then
+			checkmark.ImageColor3 = self.Theme.Controls.SelectionFocusedAccent[1].Value
+			checkmark.ImageTransparency = self.Theme.Controls.SelectionFocusedAccent[2].Value
+		end
+	end
 
-	local function update_structures()
+	local function updateLabelDisplay()
 		if not structures or not structures.CurrentTab then 
-			return;
-		end;
+			return
+		end
 
-		if not selectedValues[1] then 
-			structures.CurrentTab.Text = '';
-			return;
-		end;
-
-		structures.CurrentTab.Text = selectedValues[1]..',';
-	end;
+		if multi then
+			if #selectedValues == 0 then 
+				structures.CurrentTab.Text = ''
+			elseif #selectedValues == 1 then
+				structures.CurrentTab.Text = tostring(selectedValues[1])
+			else
+				structures.CurrentTab.Text = selectedValues[1] .. ', +' .. (#selectedValues - 1)
+			end
+		end
+	end
 
 	local function option(object, name, index)
 		local option = create("TextButton")({
@@ -9417,6 +9431,33 @@ local creator = __DIST.load('d')
 				VerticalAlignment = Enum.VerticalAlignment.Center,
 			}),
 
+			create("ImageLabel")({
+				Name = "Checkmark",
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+				BackgroundTransparency = 1,
+				BorderColor3 = Color3.fromRGB(0, 0, 0),
+				BorderSizePixel = 0,
+				Image = "rbxassetid://127464789357538",
+				ImageTransparency = 1,
+				Size = UDim2.fromOffset(16, 16),
+				Visible = multi,
+
+				__dynamicKeys = {
+					ImageColor3 = self.Theme.Text.Primary[1],
+					ImageTransparency = self.Theme.Text.Primary[2],
+				},
+			}),
+
+			create("Frame")({
+				Name = "CheckmarkRepl",
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+				BackgroundTransparency = 1,
+				BorderColor3 = Color3.fromRGB(0, 0, 0),
+				BorderSizePixel = 0,
+				Size = UDim2.fromOffset(16, 16),
+				Visible = not multi,
+			}),
+
 			create("TextLabel")({
 				Name = "Label",
 				AutomaticSize = Enum.AutomaticSize.XY,
@@ -9428,9 +9469,7 @@ local creator = __DIST.load('d')
 				LayoutOrder = 1,
 				RichText = true,
 				Text = name,
-				TextColor3 = Color3.fromRGB(0, 0, 0),
 				TextSize = 15,
-				TextTransparency = 0.15,
 				TextTruncate = Enum.TextTruncate.AtEnd,
 
 				__dynamicKeys = {
@@ -9444,92 +9483,104 @@ local creator = __DIST.load('d')
 				CornerRadius = UDim.new(0, 5),
 			}),
 		}) :: TextButton
+
 		local label = option:FindFirstChild("Label")
+		local checkmark = option:FindFirstChild("Checkmark")
 
-
-		table.insert(backup,{
-			['option'] = option,
-			['label'] = label,
+		table.insert(optionBackup, {
+			option = option,
+			label = label,
+			checkmark = checkmark,
+			index = index
 		})
 
 		structures.Options[index] = option.__instance
 
-		-- option:GetPropertyChangedSignal("GuiState"):Connect(function()
-		-- 	if not object.Expanded then
-		-- 		return
-		-- 	end
+		-- Check if this option should be selected initially
+		if multi then
+			local optionValue = properties.Options and properties.Options[index]
+			if optionValue and table.find(selectedValues, optionValue) then 
+				checkmark.ImageTransparency = self.Theme.Text.Primary[2].Value
+				table.insert(selectedIndices, index)
+			end
+		else
+			if properties.Value == (properties.Options and properties.Options[index]) then 
+				updateHover(option, label, checkmark, true)
+				structures.CurrentTab.Text = tostring(properties.Value)
+			end	
+		end
 
-		-- 	if option.GuiState == Enum.GuiState.Hover then
-		-- 		option.BackgroundTransparency = self.Theme.Controls.SelectionFocused[2].Value
+		-- Mouse hover effects
+		option.MouseEnter:Connect(function()
+			if object.Expanded then
+				updateHover(option, label, checkmark, true)
+			end
+		end)
 
-		-- 		label.TextColor3 = self.Theme.Controls.SelectionFocusedAccent[1].Value
-		-- 		label.TextTransparency = self.Theme.Controls.SelectionFocusedAccent[2].Value
+		option.MouseLeave:Connect(function()
+			if not object.Expanded then return end
+			
+			local isSelected = false
+			if multi then
+				local optionValue = properties.Options and properties.Options[index]
+				isSelected = optionValue and table.find(selectedValues, optionValue)
+			else
+				isSelected = properties.Value == (properties.Options and properties.Options[index])
+			end
 
-		-- 		warn('Hover : ')
-		-- 	else
-		-- 		option.BackgroundTransparency = 1
-
-		-- 		label.TextColor3 = self.Theme.Text.Primary[1].Value
-		-- 		label.TextTransparency = self.Theme.Text.Primary[2].Value
-
-		-- 		warn('not Hover')
-		-- 		end
-		-- end)
-
-		if multi and table.find(selectedValues, properties.Options[index]) then 
-			updateHover(option, label, true);
-			update_structures();
-		else 
-			if properties.Value == properties.Options[index] then 
-
-				updateHover(option, label, true);
-				structures.CurrentTab.Text = tostring(properties.Value);
-			end;	
-		end;
+			if not isSelected then
+				updateHover(option, label, checkmark, false)
+			end
+		end)
 
 		option.MouseButton1Click:Connect(function()
-			 if object then
-				local key = properties.Options[index]
+			if not object then return end
+			
+			local key = properties.Options and properties.Options[index]
+			if not key then return end
 
-                if multi then
-					
-					if not table.find(selectedValues, key) then 
-						table.insert(selectedValues, key);
-						updateHover(option, label, true);
-					else 
-						local removeKey = table.find(selectedValues, key)
+			if multi then
+				-- Toggle selection
+				local valueIndex = table.find(selectedValues, key)
+				
+				if valueIndex then 
+					table.remove(selectedValues, valueIndex)
+					checkmark.ImageTransparency = 1
+					local idxPos = table.find(selectedIndices, index)
+					if idxPos then
+						table.remove(selectedIndices, idxPos)
+					end
+				else 
+					table.insert(selectedValues, key)
+					table.insert(selectedIndices, index)
+					checkmark.ImageTransparency = self.Theme.Text.Primary[2].Value
+				end
 
-						if removeKey then 
-							table.remove(selectedValues, removeKey)
-							updateHover(option, label, false);
-						end;
-					end;
-					
-                    if properties.ValueChanged then
-                        properties.Value = table.clone(selectedValues)
-						object.Value = properties.Value
-                        --task.spawn(properties.ValueChanged, object, table.clone(selectedValues))
-                    end
+				updateLabelDisplay()
 
-					update_structures();
-                else
-                    object.Expanded = false
+				if properties.ValueChanged then
+					properties.Value = table.clone(selectedValues)
+					task.spawn(properties.ValueChanged, object, table.clone(selectedValues))
+				end
+			else
+				-- Single selection
+				object.Expanded = false
+				
+				-- Clear previous selections
+				for _, backup in ipairs(optionBackup) do 
+					pcall(updateHover, backup.option, backup.label, backup.checkmark, false)
+				end
+
+				-- Set new selection
+				updateHover(option, label, checkmark, true)	
+				structures.CurrentTab.Text = tostring(key)
+
+				if properties.ValueChanged then
+					properties.Value = key
 					object.Value = index
-
-                	if properties.ValueChanged then
-
-						for int, val in next, backup do 
-							pcall(updateHover, val.option, val.label, false);
-						end;
-
-						updateHover(option, label, true);	
-                        
-                        --properties.Value = key
-						structures.CurrentTab.Text = tostring(key);
-                       -- task.spawn(properties.ValueChanged, object, key)
-                    end
-                end
-            end
+					task.spawn(properties.ValueChanged, object, key)
+				end
+			end
 		end)
 	end
 
@@ -9643,7 +9694,6 @@ local creator = __DIST.load('d')
 
 			create("ScrollingFrame")({
 				Name = "PullDownMenu",
-				-- AutomaticSize = Enum.AutomaticSize.XY,
 				AutomaticSize = Enum.AutomaticSize.X,
 				BorderColor3 = Color3.fromRGB(0, 0, 0),
 				BorderSizePixel = 0,
@@ -9693,9 +9743,11 @@ local creator = __DIST.load('d')
 	local object
 	local bindings = {
 		Options = function(value: { [number]: string })
-			for _, option in ipairs(structures.Options) do
-				option:Destroy()
+			for _, opt in ipairs(structures.Options) do
+				opt:Destroy()
 			end
+			table.clear(structures.Options)
+			table.clear(optionBackup)
 
 			for index, _option in ipairs(value) do
 				option(object, _option, index)
@@ -9731,21 +9783,20 @@ local creator = __DIST.load('d')
 		end,
 
 		Value = function(value)
-			if properties.ValueChanged then
-				
-                properties.Value = value
-                warn('properties : ', value)
+			if not properties.ValueChanged then return end
+			
+			properties.Value = value
 
-                if multi then 
-					-- warn('multi : ', value, properties.ValueChanged, object)
-                    -- task.spawn(properties.ValueChanged, object, value)
-
-					properties.ValueChanged(object,value)
-
-                    return;
-                end;
-
-                local key = properties.Options[value] or value
+			if multi then 
+				-- For multi-select, value is a table
+				if type(value) == 'table' then
+					selectedValues = table.clone(value)
+					updateLabelDisplay()
+					task.spawn(properties.ValueChanged, object, value)
+				end
+			else
+				-- For single select
+				local key = properties.Options and properties.Options[value] or value
 				task.spawn(properties.ValueChanged, object, key)
 			end
 		end,
@@ -9756,46 +9807,72 @@ local creator = __DIST.load('d')
 	object.Type = "PullDownButton"
 	object.Theme = self.Theme
 	object.Structures = structures
+	object.Multi = multi
+	
 	object.Option = function(self, name: string?)
 		local index = #structures.Options + 1
-
 		option(object, name, index)
-
 		table.insert(object.Options, name)
-
 		return structures.Options[index]
 	end
 
 	object.SetValues = function(self, values)
 		if not values or type(values) ~= 'table' then 
-			return;
-		end;
+			return
+		end
 
-		for int, val in next, structures.Options do 
-			val:Destroy()
-			table.clear(object.Options)
-		end;
-
-		table.clear(structures.Options);
+		for _, opt in ipairs(structures.Options) do 
+			opt:Destroy()
+		end
+		table.clear(structures.Options)
+		table.clear(optionBackup)
+		table.clear(object.Options)
 		
-		for int, val in next, values do 
+		for _, val in ipairs(values) do 
 			table.insert(object.Options, val)
-			option(object, val, #structures.Options+1)
-		end;
-	end;
+			option(object, val, #structures.Options + 1)
+		end
+	end
 
-	object.SetValue = function(value) 
+	object.GetSelectedValues = function(self)
+		return multi and table.clone(selectedValues) or properties.Value
+	end
 
-	end;
+	object.ClearSelection = function(self)
+		if multi then
+			table.clear(selectedValues)
+			table.clear(selectedIndices)
+			updateLabelDisplay()
+			
+			for _, backup in ipairs(optionBackup) do
+				if backup.checkmark then
+					backup.checkmark.ImageTransparency = 1
+				end
+			end
+		end
+	end
 
 	object.Remove = function(self, index: number?)
 		if index and structures.Options[index] then
 			structures.Options[index]:Destroy()
-			object.Options[index] = nil
+			table.remove(object.Options, index)
+			
+			-- Update backup table
+			for i = #optionBackup, 1, -1 do
+				if optionBackup[i].index == index then
+					table.remove(optionBackup, i)
+					break
+				end
+			end
 		end
 	end
 
 	binder.Apply(properties, object)
+
+	-- Update label display on initialization
+	if multi and #selectedValues > 0 then
+		updateLabelDisplay()
+	end
 
 	structures.Body:GetPropertyChangedSignal("AbsolutePosition"):Connect(anchor)
 	structures.Body:GetPropertyChangedSignal("AbsoluteSize"):Connect(anchor)
@@ -9834,6 +9911,7 @@ local creator = __DIST.load('d')
 
 	return object
 end
+
 end function __DIST.J()--// Imports
 
 local binder = __DIST.load('c')
