@@ -9558,6 +9558,11 @@ return function(self, properties: PullDownButtonProperties__DARKLUA_TYPE_0): Pul
 		if opening then
 			return
 		end
+
+		if not optionBackup or #optionBackup == 0 then
+			return
+		end
+
 		opening = true
 		
 		local open = not optionBackup[1].instance.Visible
