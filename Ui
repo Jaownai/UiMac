@@ -9286,629 +9286,410 @@ end
 end function __DIST.I()
 local types = __DIST.load('b')
 
-local types = __DIST.load('b')
-
 return function(self, properties: PullDownButtonProperties__DARKLUA_TYPE_0): PullDownButton__DARKLUA_TYPE_1
-	--// Imports
-	local creator = __DIST.load('d')
-	local binder = __DIST.load('c')
-	local services = __DIST.load('e')
-
-	--// References
-	local create = creator.Create
-
-	-- Initialize Multi-select support
-	local multi = properties.Multi == true
+	properties = properties or {}
+	local multi = properties.Multi or false
 	local selectedValues = {}
 	local selectedIndices = {}
-
-	-- Load initial values for multi-select
-	if multi then
-		if properties.Value and type(properties.Value) == 'table' then 
-			for _, val in ipairs(properties.Value) do 
-				table.insert(selectedValues, val)
-			end
-		end
-	end
-
-	-- Ensure Label exists
-	if not properties.Label then 
-		properties.Label = ''
-	end
-
-	local userInputService = services.UserInputService
-	local tweenService = services.TweenService
-	local workspace = services.Workspace
-	local guiService = services.GuiService
-
-	local camera = workspace.CurrentCamera
-
-	--// Variables
-	local parent = self.__container or self.__instance or self
-	local theme = self.Theme.Controls.MenuButton
-	local structures = {
-		Options = {},
-	}
-
-	--// Constants
-	local HORIZONTAL_OFFSET = -1
-	local VERTICAL_PADDING = 6
-	local EDGE_BUFFER = 6
-
-	--// Functions
-	local function anchor()
-		local body = structures.Body
-		local menu = structures.Menu
-
-		if not menu or not body then
-			return
-		end
-
-		local bodyPos = body.AbsolutePosition
-		local bodySize = body.AbsoluteSize
-		local menuSize = menu.AbsoluteSize
-		local viewportSize = camera.ViewportSize
-
-		local desiredX = bodyPos.X + HORIZONTAL_OFFSET
-		local desiredY = bodyPos.Y + (bodySize.Y * 3) + (VERTICAL_PADDING * 3)
-
-		local maxX = math.max(EDGE_BUFFER, viewportSize.X - EDGE_BUFFER - menuSize.X)
-		local maxY = math.max(EDGE_BUFFER, viewportSize.Y - EDGE_BUFFER - menuSize.Y)
-
-		desiredX = math.clamp(desiredX, EDGE_BUFFER, maxX)
-		desiredY = math.clamp(desiredY, EDGE_BUFFER, maxY)
-
-		menu.Position = UDim2.new(0, desiredX, 0, desiredY)
-	end
-
 	local optionBackup = {}
-
-	local function updateHover(option, label, checkmark, isHovered) 
-		if not isHovered then 
-			option.BackgroundTransparency = 1
-			label.TextColor3 = self.Theme.Text.Primary[1].Value
-			label.TextTransparency = self.Theme.Text.Primary[2].Value
-			if checkmark then
-				checkmark.ImageColor3 = self.Theme.Text.Primary[1].Value
-				checkmark.ImageTransparency = self.Theme.Text.Primary[2].Value
+	
+	-- Initialize selectedValues and selectedIndices for multi-select mode
+	if multi and properties.Value and type(properties.Value) == 'table' then
+		for _, val in ipairs(properties.Value) do
+			if properties.Options then
+				for i, opt in ipairs(properties.Options) do
+					if opt == val then
+						table.insert(selectedValues, val)
+						table.insert(selectedIndices, i)
+						break
+					end
+				end
 			end
-			return
-		end
-
-		option.BackgroundTransparency = self.Theme.Controls.SelectionFocused[2].Value
-		label.TextColor3 = self.Theme.Controls.SelectionFocusedAccent[1].Value
-		label.TextTransparency = self.Theme.Controls.SelectionFocusedAccent[2].Value
-		if checkmark then
-			checkmark.ImageColor3 = self.Theme.Controls.SelectionFocusedAccent[1].Value
-			checkmark.ImageTransparency = self.Theme.Controls.SelectionFocusedAccent[2].Value
 		end
 	end
-
+	
+	local structures = {
+		Wrapper = NewObject("Frame", {
+			Name = "PullDownButton",
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			LayoutOrder = properties.LayoutOrder or 1
+		}),
+		Container = NewObject("Frame", {
+			Name = "Container",
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			ClipsDescendants = true
+		}),
+		ListLayout = NewObject("UIListLayout", {
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 4)
+		}),
+		Padding = NewObject("UIPadding", {
+			PaddingTop = UDim.new(0, 4),
+			PaddingBottom = UDim.new(0, 4)
+		}),
+		CurrentTab = NewObject("TextButton", {
+			Name = "CurrentTab",
+			AutoButtonColor = false,
+			BackgroundColor3 = self.Theme.Secondary.Main[1].Value,
+			BorderSizePixel = 0,
+			LayoutOrder = 1,
+			Size = UDim2.new(1, 0, 0, 32),
+			Font = Enum.Font.Gotham,
+			Text = if multi then (properties.Label or '') else (properties.Value or properties.Label or ''),
+			TextSize = 14,
+			TextColor3 = self.Theme.Text.Primary[1].Value,
+			TextTransparency = self.Theme.Text.Primary[2].Value,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Visible = not multi  -- Initially hidden for multi-select
+		}),
+		CurrentTab_Corner = NewObject("UICorner", {
+			CornerRadius = UDim.new(0, 4)
+		}),
+		CurrentTab_Stroke = NewObject("UIStroke", {
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			Color = self.Theme.Outline[1].Value,
+			Transparency = self.Theme.Outline[2].Value
+		}),
+		CurrentTab_Padding = NewObject("UIPadding", {
+			PaddingLeft = UDim.new(0, 12),
+			PaddingRight = UDim.new(0, 12)
+		}),
+		CurrentTab_Icon = NewObject("ImageLabel", {
+			Name = "Icon",
+			AnchorPoint = Vector2.new(1, 0.5),
+			BackgroundTransparency = 1,
+			Position = UDim2.new(1, -4, 0.5, 0),
+			Size = UDim2.fromOffset(16, 16),
+			Image = "rbxassetid://11963373994",
+			ImageColor3 = self.Theme.Text.Primary[1].Value,
+			ImageTransparency = self.Theme.Text.Primary[2].Value
+		})
+	}
+	
+	-- Add theme change listeners
+	table.insert(self.Disconnect, self.Theme.Secondary.Main[1]:GetPropertyChangedSignal("Value"):Connect(function()
+		structures.CurrentTab.BackgroundColor3 = self.Theme.Secondary.Main[1].Value
+	end))
+	table.insert(self.Disconnect, self.Theme.Text.Primary[1]:GetPropertyChangedSignal("Value"):Connect(function()
+		structures.CurrentTab.TextColor3 = self.Theme.Text.Primary[1].Value
+		structures.CurrentTab_Icon.ImageColor3 = self.Theme.Text.Primary[1].Value
+	end))
+	table.insert(self.Disconnect, self.Theme.Text.Primary[2]:GetPropertyChangedSignal("Value"):Connect(function()
+		structures.CurrentTab.TextTransparency = self.Theme.Text.Primary[2].Value
+		structures.CurrentTab_Icon.ImageTransparency = self.Theme.Text.Primary[2].Value
+	end))
+	table.insert(self.Disconnect, self.Theme.Outline[1]:GetPropertyChangedSignal("Value"):Connect(function()
+		structures.CurrentTab_Stroke.Color = self.Theme.Outline[1].Value
+	end))
+	table.insert(self.Disconnect, self.Theme.Outline[2]:GetPropertyChangedSignal("Value"):Connect(function()
+		structures.CurrentTab_Stroke.Transparency = self.Theme.Outline[2].Value
+	end))
+	
+	-- Function to update label display for multi-select
 	local function updateLabelDisplay()
-		if not structures or not structures.CurrentTab then 
-			return
-		end
-
 		if multi then
 			if #selectedValues == 0 then 
-				structures.CurrentTab.Text = ''
+				structures.CurrentTab.Text = properties.Label or ''
 			elseif #selectedValues == 1 then
 				structures.CurrentTab.Text = tostring(selectedValues[1])
 			else
 				structures.CurrentTab.Text = selectedValues[1] .. ', +' .. (#selectedValues - 1)
 			end
+			structures.CurrentTab.Visible = true
 		end
 	end
-
-	local function option(object, name, index)
-		local option = create("TextButton")({
-			Name = "Item",
-			Size = UDim2.fromScale(1, 0),
-			AutoButtonColor = false,
-			AutomaticSize = Enum.AutomaticSize.XY,
-			BackgroundColor3 = Color3.fromRGB(0, 122, 255),
-			BackgroundTransparency = 1,
-			BorderColor3 = Color3.fromRGB(0, 0, 0),
-			BorderSizePixel = 0,
-			Selectable = false,
-			Text = "",
-			LayoutOrder = index,
-			Parent = structures.Menu,
-
-			create("UIPadding")({
-				Name = "UIPadding",
-				PaddingBottom = UDim.new(0, 3),
-				PaddingLeft = UDim.new(0, 7),
-				PaddingRight = UDim.new(0, 12),
-				PaddingTop = UDim.new(0, 3),
-			}),
-
-			create("UIListLayout")({
-				Name = "UIListLayout",
-				FillDirection = Enum.FillDirection.Horizontal,
-				Padding = UDim.new(0, 2),
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-			}),
-
-			create("ImageLabel")({
-				Name = "Checkmark",
-				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-				BackgroundTransparency = 1,
-				BorderColor3 = Color3.fromRGB(0, 0, 0),
-				BorderSizePixel = 0,
-				Image = "rbxassetid://127464789357538",
-				ImageTransparency = 1,
-				Size = UDim2.fromOffset(16, 16),
-				Visible = multi,
-
-				__dynamicKeys = {
-					ImageColor3 = self.Theme.Text.Primary[1],
-					ImageTransparency = self.Theme.Text.Primary[2],
-				},
-			}),
-
-			create("Frame")({
-				Name = "CheckmarkRepl",
-				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-				BackgroundTransparency = 1,
-				BorderColor3 = Color3.fromRGB(0, 0, 0),
-				BorderSizePixel = 0,
-				Size = UDim2.fromOffset(16, 16),
-				Visible = not multi,
-			}),
-
-			create("TextLabel")({
-				Name = "Label",
-				AutomaticSize = Enum.AutomaticSize.XY,
-				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-				BackgroundTransparency = 1,
-				BorderColor3 = Color3.fromRGB(0, 0, 0),
-				BorderSizePixel = 0,
-				FontFace = Font.new("rbxassetid://12187365364"),
-				LayoutOrder = 1,
-				RichText = true,
-				Text = name,
-				TextSize = 15,
-				TextTruncate = Enum.TextTruncate.AtEnd,
-
-				__dynamicKeys = {
-					TextColor3 = self.Theme.Text.Primary[1],
-					TextTransparency = self.Theme.Text.Primary[2],
-				},
-			}),
-
-			create("UICorner")({
-				Name = "UICorner",
-				CornerRadius = UDim.new(0, 5),
-			}),
-		}) :: TextButton
-
-		local label = option:FindFirstChild("Label")
-		local checkmark = option:FindFirstChild("Checkmark")
-
-		table.insert(optionBackup, {
-			option = option,
-			label = label,
-			checkmark = checkmark,
-			index = index
-		})
-
-		structures.Options[index] = option.__instance
-
-		-- Check if this option should be selected initially
-		if multi then
-			local optionValue = properties.Options and properties.Options[index]
-			if optionValue and table.find(selectedValues, optionValue) then 
-				checkmark.ImageTransparency = self.Theme.Text.Primary[2].Value
-				table.insert(selectedIndices, index)
-			end
-		else
-			if properties.Value == (properties.Options and properties.Options[index]) then 
-				updateHover(option, label, checkmark, true)
-				structures.CurrentTab.Text = tostring(properties.Value)
-			end	
-		end
-
-		-- Mouse hover effects
-		option.MouseEnter:Connect(function()
-			if object.Expanded then
-				updateHover(option, label, checkmark, true)
-			end
-		end)
-
-		option.MouseLeave:Connect(function()
-			if not object.Expanded then return end
-			
-			local isSelected = false
-			if multi then
-				local optionValue = properties.Options and properties.Options[index]
-				isSelected = optionValue and table.find(selectedValues, optionValue)
-			else
-				isSelected = properties.Value == (properties.Options and properties.Options[index])
-			end
-
-			if not isSelected then
-				updateHover(option, label, checkmark, false)
-			end
-		end)
-
-		option.MouseButton1Click:Connect(function()
-			if not object then return end
-			
-			local key = properties.Options and properties.Options[index]
-			if not key then return end
-
-			if multi then
-				-- Toggle selection
-				local valueIndex = table.find(selectedValues, key)
-				
-				if valueIndex then 
-					table.remove(selectedValues, valueIndex)
-					checkmark.ImageTransparency = 1
-					local idxPos = table.find(selectedIndices, index)
-					if idxPos then
-						table.remove(selectedIndices, idxPos)
-					end
-				else 
-					table.insert(selectedValues, key)
-					table.insert(selectedIndices, index)
-					checkmark.ImageTransparency = self.Theme.Text.Primary[2].Value
-				end
-
-				updateLabelDisplay()
-
-				if properties.ValueChanged then
-					properties.Value = table.clone(selectedValues)
-					task.spawn(properties.ValueChanged, object, table.clone(selectedValues))
-				end
-			else
-				-- Single selection
-				object.Expanded = false
-				
-				-- Clear previous selections
-				for _, backup in ipairs(optionBackup) do 
-					pcall(updateHover, backup.option, backup.label, backup.checkmark, false)
-				end
-
-				-- Set new selection
-				updateHover(option, label, checkmark, true)	
-				structures.CurrentTab.Text = tostring(key)
-
-				if properties.ValueChanged then
-					properties.Value = key
-					object.Value = index
-					task.spawn(properties.ValueChanged, object, key)
-				end
-			end
-		end)
-	end
-
-	--// UI
-	properties = properties or {}
-	properties.Expanded = properties.Expanded or false
-
-	structures.Body = binder.Apply(
-		properties,
-		create("TextButton")({
-			Name = "PullDownButton",
-			AutomaticSize = Enum.AutomaticSize.XY,
-			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-			BackgroundTransparency = 1,
-			BorderColor3 = Color3.fromRGB(0, 0, 0),
-			BorderSizePixel = 0,
-			Selectable = false,
-			Text = "",
-			Parent = parent,
-
-			create("UIPadding")({
-				Name = "UIPadding",
-				PaddingBottom = UDim.new(0, 3),
-				PaddingLeft = UDim.new(0, 7),
-				PaddingRight = UDim.new(0, 3),
-				PaddingTop = UDim.new(0, 3),
-			}),
-
-			create("UIListLayout")({
-				Name = "UIListLayout",
-				FillDirection = Enum.FillDirection.Horizontal,
-				Padding = UDim.new(0, 7),
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-			}),
-
-			create("Frame")({
-				Name = "PullDownIndicator",
-				BorderColor3 = Color3.fromRGB(0, 0, 0),
-				BorderSizePixel = 0,
-				LayoutOrder = 1,
-				Selectable = true,
-				Size = UDim2.fromOffset(16, 16),
-
-				__dynamicKeys = {
-					BackgroundColor3 = theme.IndicatorBackground[1],
-					BackgroundTransparency = theme.IndicatorBackground[2],
-				},
-
-				create("UICorner")({
-					Name = "UICorner",
-					CornerRadius = UDim.new(0, 4),
-				}),
-
-				create("ImageLabel")({
-					Name = "Indicators",
-					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-					BackgroundTransparency = 1,
-					BorderColor3 = Color3.fromRGB(0, 0, 0),
-					BorderSizePixel = 0,
-					Image = "rbxassetid://86693411280110",
-					Size = UDim2.fromScale(1, 1),
-
-					__dynamicKeys = {
-						ImageColor3 = self.Theme.Text.Primary[1],
-						ImageTransparency = self.Theme.Text.Primary[2],
-					},
-				}),
-			}),
-
-			create("TextLabel")({
-				Name = "Label",
-				AutomaticSize = Enum.AutomaticSize.XY,
-				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-				BackgroundTransparency = 1,
-				BorderColor3 = Color3.fromRGB(0, 0, 0),
-				BorderSizePixel = 0,
-				FontFace = Font.new("rbxassetid://12187365364"),
-				RichText = true,
-				TextSize = 15,
-				TextTransparency = 0.15,
-				TextTruncate = Enum.TextTruncate.AtEnd,
-				Visible = false,
-
-				__dynamicKeys = {
-					TextColor3 = self.Theme.Text.Primary[1],
-					TextTransparency = self.Theme.Text.Primary[2],
-				},
-			}),
-		})
-	) :: TextButton
-
-	--// Initialize
-	structures.PullDownIndicator = structures.Body:FindFirstChild("PullDownIndicator") :: Frame
-	structures.CurrentTab = structures.Body:FindFirstChild("Label") :: TextLabel
-
-	structures.MenuContainer = create("ScreenGui")({
-		Name = "Container",
-		IgnoreGuiInset = true,
-		ScreenInsets = Enum.ScreenInsets.None,
-		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-		DisplayOrder = 201,
-		OnTopOfCoreBlur = true,
-
-		create("CanvasGroup")({
-			Name = "MenuBody",
-			BorderColor3 = Color3.fromRGB(0, 0, 0),
-			BorderSizePixel = 0,
-			BackgroundTransparency = 1,
-			Size = UDim2.fromScale(1, 1),
-
-			create("ScrollingFrame")({
-				Name = "PullDownMenu",
-				AutomaticSize = Enum.AutomaticSize.X,
-				BorderColor3 = Color3.fromRGB(0, 0, 0),
-				BorderSizePixel = 0,
-				AutomaticCanvasSize = Enum.AutomaticSize.Y,
-				CanvasSize = UDim2.new(),
-				Size = UDim2.new(0, 0, 0, 200),
-				ScrollBarImageColor3 = Color3.fromRGB(0, 0, 0),
-				ScrollBarImageTransparency = 0.5,
-				ScrollBarThickness = 3,
-
-				__dynamicKeys = {
-					BackgroundColor3 = theme.MenuBackground[1],
-					BackgroundTransparency = theme.MenuBackground[2],
-				},
-
-				create("UICorner")({
-					Name = "UICorner",
-					CornerRadius = UDim.new(0, 6),
-				}),
-
-				create("UIStroke")({
-					Name = "UIStroke",
-					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-					Transparency = 0.9,
-				}),
-
-				create("UIPadding")({
-					Name = "UIPadding",
-					PaddingBottom = UDim.new(0, 5),
-					PaddingLeft = UDim.new(0, 5),
-					PaddingRight = UDim.new(0, 5),
-					PaddingTop = UDim.new(0, 5),
-				}),
-
-				create("UIListLayout")({
-					Name = "UIListLayout",
-					SortOrder = Enum.SortOrder.LayoutOrder,
-					Padding = UDim.new(0, 1),
-				}),
-			}),
-		}),
-	}) :: ScreenGui
-
-	structures.MenuBody = structures.MenuContainer:FindFirstChild("MenuBody") :: CanvasGroup
-	structures.Menu = structures.MenuBody:FindFirstChild("PullDownMenu") :: ScrollingFrame
-
-	local object
-	local bindings = {
-		Options = function(value: { [number]: string })
-			for _, opt in ipairs(structures.Options) do
-				opt:Destroy()
-			end
-			table.clear(structures.Options)
-			table.clear(optionBackup)
-
-			for index, _option in ipairs(value) do
-				option(object, _option, index)
-			end
-		end,
-
-		Expanded = function(value: boolean)
-			local expand = value == true
-
-			if expand then
-				structures.MenuContainer.Parent = structures.Body.__instance
-			end
-
-			anchor()
-
-			local goal = { GroupTransparency = expand and 0 or 1 }
-			local tweenInfo = TweenInfo.new(expand and 0 or 0.4, Enum.EasingStyle.Exponential)
-			local tween = tweenService:Create(structures.MenuBody, tweenInfo, goal)
-
-			tween:Play()
-			tween.Completed:Connect(function()
-				if object.Expanded == false then
-					structures.MenuContainer.Parent = nil
-				end
-			end)
-		end,
-
-		Label = function(value: string)
-			if type(value) == "string" then
-				structures.CurrentTab.Visible = true
-				structures.CurrentTab.Text = value
-			end
-		end,
-
-		Value = function(value)
-			if not properties.ValueChanged then return end
-			
-			properties.Value = value
-
-			if multi then 
-				-- For multi-select, value is a table
-				if type(value) == 'table' then
-					selectedValues = table.clone(value)
-					updateLabelDisplay()
-					task.spawn(properties.ValueChanged, object, value)
-				end
-			else
-				-- For single select
-				local key = properties.Options and properties.Options[value] or value
-				task.spawn(properties.ValueChanged, object, key)
-			end
-		end,
-	}
-
-	object = binder.Wrap(properties, bindings, structures.Body)
-
-	object.Type = "PullDownButton"
-	object.Theme = self.Theme
-	object.Structures = structures
-	object.Multi = multi
 	
-	object.Option = function(self, name: string?)
-		local index = #structures.Options + 1
-		option(object, name, index)
-		table.insert(object.Options, name)
-		return structures.Options[index]
+	-- Call initially to set the label
+	if multi then
+		updateLabelDisplay()
 	end
-
-	object.SetValues = function(self, values)
-		if not values or type(values) ~= 'table' then 
+	
+	-- Parent all structures
+	structures.CurrentTab_Icon.Parent = structures.CurrentTab
+	structures.CurrentTab_Padding.Parent = structures.CurrentTab
+	structures.CurrentTab_Stroke.Parent = structures.CurrentTab
+	structures.CurrentTab_Corner.Parent = structures.CurrentTab
+	structures.CurrentTab.Parent = structures.Container
+	structures.Padding.Parent = structures.Container
+	structures.ListLayout.Parent = structures.Container
+	structures.Container.Parent = structures.Wrapper
+	
+	-- Create object
+	local object = setmetatable({
+		Type = "PullDownButton",
+		Instance = structures.Wrapper
+	}, PullDownButton)
+	
+	-- Function to update options
+	local function UpdateOptions(Options)
+		for _, v in ipairs(optionBackup) do
+			if v.instance then
+				v.instance:Destroy()
+			end
+		end
+		table.clear(optionBackup)
+		
+		if not Options then
 			return
 		end
-
-		for _, opt in ipairs(structures.Options) do 
-			opt:Destroy()
-		end
-		table.clear(structures.Options)
-		table.clear(optionBackup)
-		table.clear(object.Options)
 		
-		for _, val in ipairs(values) do 
-			table.insert(object.Options, val)
-			option(object, val, #structures.Options + 1)
+		for index, key in ipairs(Options) do
+			local option = NewObject("TextButton", {
+				Name = "Option",
+				AutoButtonColor = false,
+				BackgroundColor3 = self.Theme.Secondary.Main[1].Value,
+				BorderSizePixel = 0,
+				LayoutOrder = index + 1,
+				Size = UDim2.new(1, 0, 0, 32),
+				Font = Enum.Font.Gotham,
+				Text = tostring(key),
+				TextSize = 14,
+				TextColor3 = self.Theme.Text.Primary[1].Value,
+				TextTransparency = self.Theme.Text.Primary[2].Value,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Visible = false
+			})
+			
+			local option_Corner = NewObject("UICorner", {
+				CornerRadius = UDim.new(0, 4),
+				Parent = option
+			})
+			
+			local option_Stroke = NewObject("UIStroke", {
+				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+				Color = self.Theme.Outline[1].Value,
+				Transparency = self.Theme.Outline[2].Value,
+				Parent = option
+			})
+			
+			local option_Padding = NewObject("UIPadding", {
+				PaddingLeft = UDim.new(0, 12),
+				PaddingRight = UDim.new(0, 12),
+				Parent = option
+			})
+			
+			local checkmark = nil
+			if multi then
+				checkmark = NewObject("ImageLabel", {
+					Name = "Checkmark",
+					AnchorPoint = Vector2.new(1, 0.5),
+					BackgroundTransparency = 1,
+					Position = UDim2.new(1, -4, 0.5, 0),
+					Size = UDim2.fromOffset(16, 16),
+					Image = "rbxassetid://11963372881",
+					ImageColor3 = self.Theme.Text.Primary[1].Value,
+					ImageTransparency = table.find(selectedIndices, index) and self.Theme.Text.Primary[2].Value or 1,
+					Parent = option
+				})
+			end
+			
+			table.insert(self.Disconnect, self.Theme.Secondary.Main[1]:GetPropertyChangedSignal("Value"):Connect(function()
+				option.BackgroundColor3 = self.Theme.Secondary.Main[1].Value
+			end))
+			table.insert(self.Disconnect, self.Theme.Text.Primary[1]:GetPropertyChangedSignal("Value"):Connect(function()
+				option.TextColor3 = self.Theme.Text.Primary[1].Value
+				if checkmark then
+					checkmark.ImageColor3 = self.Theme.Text.Primary[1].Value
+				end
+			end))
+			table.insert(self.Disconnect, self.Theme.Text.Primary[2]:GetPropertyChangedSignal("Value"):Connect(function()
+				option.TextTransparency = self.Theme.Text.Primary[2].Value
+			end))
+			table.insert(self.Disconnect, self.Theme.Outline[1]:GetPropertyChangedSignal("Value"):Connect(function()
+				option_Stroke.Color = self.Theme.Outline[1].Value
+			end))
+			table.insert(self.Disconnect, self.Theme.Outline[2]:GetPropertyChangedSignal("Value"):Connect(function()
+				option_Stroke.Transparency = self.Theme.Outline[2].Value
+			end))
+			
+			table.insert(self.Disconnect, option.MouseButton1Click:Connect(function()
+				if multi then
+					-- Multi-select mode
+					local valueIndex = table.find(selectedValues, key)
+					local indexPos = table.find(selectedIndices, index)
+					
+					if valueIndex then 
+						-- Deselect
+						table.remove(selectedValues, valueIndex)
+						table.remove(selectedIndices, indexPos)
+						checkmark.ImageTransparency = 1
+					else 
+						-- Select
+						table.insert(selectedValues, key)
+						table.insert(selectedIndices, index)
+						checkmark.ImageTransparency = self.Theme.Text.Primary[2].Value
+					end
+					
+					-- Update the label display
+					updateLabelDisplay()
+					
+					-- Fire callback with all selected values
+					if properties.ValueChanged then
+						properties.Value = table.clone(selectedValues)
+						task.spawn(properties.ValueChanged, object, table.clone(selectedValues))
+					end
+				else
+					-- Single-select mode
+					structures.CurrentTab.Text = tostring(key)
+					object:Close()
+					if properties.ValueChanged then
+						properties.Value = key
+						task.spawn(properties.ValueChanged, object, key)
+					end
+				end
+			end))
+			
+			option.Parent = structures.Container
+			table.insert(optionBackup, {
+				index = index,
+				instance = option,
+				checkmark = checkmark
+			})
 		end
 	end
-
-	object.GetSelectedValues = function(self)
-		return multi and table.clone(selectedValues) or properties.Value
+	
+	-- Toggle function
+	local opening = false
+	function object:Toggle()
+		if opening then
+			return
+		end
+		opening = true
+		
+		local open = not optionBackup[1].instance.Visible
+		local total = #optionBackup
+		
+		if open then
+			for i = 1, total do
+				local v = optionBackup[i]
+				v.instance.Visible = true
+				TweenService:Create(v.instance, TweenInfo.new(0.1 + i * 0.025), {
+					BackgroundTransparency = 0
+				}):Play()
+				TweenService:Create(v.instance, TweenInfo.new(0.1 + i * 0.025), {
+					TextTransparency = self.Theme.Text.Primary[2].Value
+				}):Play()
+			end
+			TweenService:Create(structures.CurrentTab_Icon, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+				Rotation = 180
+			}):Play()
+		else
+			for i = 1, total do
+				local v = optionBackup[total - i + 1]
+				TweenService:Create(v.instance, TweenInfo.new(0.1 + i * 0.025), {
+					BackgroundTransparency = 1
+				}):Play()
+				local tween = TweenService:Create(v.instance, TweenInfo.new(0.1 + i * 0.025), {
+					TextTransparency = 1
+				})
+				if i == total then
+					tween.Completed:Connect(function()
+						for _, backup in ipairs(optionBackup) do
+							backup.instance.Visible = false
+						end
+					end)
+				end
+				tween:Play()
+			end
+			TweenService:Create(structures.CurrentTab_Icon, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+				Rotation = 0
+			}):Play()
+		end
+		
+		task.delay(0.1 + total * 0.025, function()
+			opening = false
+		end)
 	end
-
-	object.ClearSelection = function(self)
+	
+	-- Open function
+	function object:Open()
+		if not optionBackup[1] or optionBackup[1].instance.Visible then
+			return
+		end
+		object:Toggle()
+	end
+	
+	-- Close function
+	function object:Close()
+		if not optionBackup[1] or not optionBackup[1].instance.Visible then
+			return
+		end
+		object:Toggle()
+	end
+	
+	-- SetOptions function
+	function object:SetOptions(Options)
+		properties.Options = Options
+		UpdateOptions(Options)
+	end
+	
+	-- SetValue function (for single-select)
+	function object:SetValue(Value)
 		if multi then
-			table.clear(selectedValues)
-			table.clear(selectedIndices)
-			updateLabelDisplay()
-			
-			for _, backup in ipairs(optionBackup) do
-				if backup.checkmark then
+			return
+		end
+		properties.Value = Value
+		structures.CurrentTab.Text = tostring(Value)
+	end
+	
+	-- SetSelectedValues function (for multi-select)
+	function object:SetSelectedValues(values)
+		if not multi or not values or type(values) ~= 'table' then
+			return
+		end
+		
+		-- Clear current selections
+		table.clear(selectedValues)
+		table.clear(selectedIndices)
+		
+		-- Add new selections
+		for _, val in ipairs(values) do
+			if properties.Options then
+				for i, opt in ipairs(properties.Options) do
+					if opt == val then
+						table.insert(selectedValues, val)
+						table.insert(selectedIndices, i)
+						break
+					end
+				end
+			end
+		end
+		
+		-- Update checkmarks
+		for _, backup in ipairs(optionBackup) do
+			if backup.checkmark then
+				if table.find(selectedIndices, backup.index) then
+					backup.checkmark.ImageTransparency = self.Theme.Text.Primary[2].Value
+				else
 					backup.checkmark.ImageTransparency = 1
 				end
 			end
 		end
-	end
-
-	object.Remove = function(self, index: number?)
-		if index and structures.Options[index] then
-			structures.Options[index]:Destroy()
-			table.remove(object.Options, index)
-			
-			-- Update backup table
-			for i = #optionBackup, 1, -1 do
-				if optionBackup[i].index == index then
-					table.remove(optionBackup, i)
-					break
-				end
-			end
-		end
-	end
-
-	binder.Apply(properties, object)
-
-	-- Update label display on initialization
-	if multi and #selectedValues > 0 then
+		
+		-- Update label display
 		updateLabelDisplay()
 	end
-
-	structures.Body:GetPropertyChangedSignal("AbsolutePosition"):Connect(anchor)
-	structures.Body:GetPropertyChangedSignal("AbsoluteSize"):Connect(anchor)
-	structures.Menu:GetPropertyChangedSignal("AbsoluteSize"):Connect(anchor)
-
-	userInputService.InputBegan:Connect(function(input)
-		if
-			object.Expanded
-			and (
-				input.UserInputType == Enum.UserInputType.MouseButton1
-				or input.UserInputType == Enum.UserInputType.Touch
-			)
-		then
-			local mouse = userInputService:GetMouseLocation()
-			local inset = guiService:GetGuiInset()
-			local menuFrame = structures.Menu
-			local pos = menuFrame.AbsolutePosition
-			local size = menuFrame.AbsoluteSize
-
-			local adjustedMouseY = mouse.Y - inset.Y
-
-			if
-				mouse.X < pos.X
-				or mouse.X > pos.X + size.X
-				or adjustedMouseY < pos.Y
-				or adjustedMouseY > pos.Y + size.Y
-			then
-				object.Expanded = false
-			end
+	
+	-- GetSelectedValues function (for multi-select)
+	function object:GetSelectedValues()
+		if not multi then
+			return nil
 		end
-	end)
-
-	structures.Body.MouseButton1Click:Connect(function()
-		object.Expanded = not object.Expanded
-	end)
-
+		return table.clone(selectedValues)
+	end
+	
+	-- Connect click event
+	table.insert(self.Disconnect, structures.CurrentTab.MouseButton1Click:Connect(function()
+		object:Toggle()
+	end))
+	
+	-- Initialize options
+	UpdateOptions(properties.Options)
+	
 	return object
 end
 
